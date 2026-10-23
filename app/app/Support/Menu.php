@@ -20,7 +20,6 @@ class Menu
     {
         return [
             ['jenis-cuti.index', 'sliders', 'Jenis & Jatah Cuti', 'Jenis cuti dan jatah hari per tahun'],
-            ['pengaturan.admin', 'shield-lock', 'Admin Lokal', 'Akun admin cadangan saat eUniversity tidak bisa diakses'],
             ['pengaturan.sinkron', 'arrow-repeat', 'Sinkron eUniversity', 'Tarik data pegawai & dosen dari API'],
             ['pengaturan.api', 'plug', 'Integrasi API', 'Alamat API, akun layanan, pemetaan role, cek koneksi'],
         ];

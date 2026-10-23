@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-// Tidak ada token eUniversity yang valid (admin lokal, atau token kedaluwarsa/dicabut).
+// Tidak ada token eUniversity yang valid (token kedaluwarsa/dicabut, atau session hilang).
 // Ditangani di Exceptions\Handler: kembali ke halaman sebelumnya dengan pesan.
 class SesiApiHabis extends \RuntimeException
 {

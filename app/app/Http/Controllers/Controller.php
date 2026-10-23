@@ -16,7 +16,7 @@ class Controller extends BaseController
         return \Illuminate\Support\Facades\Gate::allows('admin');
     }
 
-    // hrd_staffs.id milik pegawai yang login (null untuk admin lokal / dosen non-staff)
+    // hrd_staffs.id milik pegawai yang login (null untuk dosen non-staff / akun belum tertaut)
     protected function myStaffId(): ?int
     {
         return auth('pegawai')->user()?->staff_id;

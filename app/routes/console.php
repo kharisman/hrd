@@ -1,15 +1,6 @@
 <?php
 
-use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Hash;
-
-// php artisan hrd:admin "Nama" email@palcomtech.ac.id
-Artisan::command('hrd:admin {name} {email}', function ($name, $email) {
-    $password = $this->secret('Password');
-    User::updateOrCreate(['email' => $email], ['name' => $name, 'password' => Hash::make($password)]);
-    $this->info("Admin HRD $email siap.");
-})->purpose('Buat / reset akun admin HRD');
 
 // Sinkron dari terminal memakai akun eUniversity orang yang menjalankan (tidak ada akun layanan).
 // Akun perlu izin staff.read & dosen.read. Token dicabut setelah selesai.

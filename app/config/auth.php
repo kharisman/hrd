@@ -13,9 +13,9 @@ return [
     |
     */
 
+    // Satu-satunya cara masuk: akun eUniversity (API). Password dikelola eUniversity, tidak ada reset di HRD.
     'defaults' => [
-        'guard' => 'web',
-        'passwords' => 'users',
+        'guard' => 'pegawai',
     ],
 
     /*
@@ -36,11 +36,7 @@ return [
     */
 
     'guards' => [
-        'web' => [
-            'driver' => 'session',
-            'provider' => 'users',
-        ],
-        // Pegawai / dosen / staf login pakai akun eUniversity (API), disimpan di tabel akuns
+        // Admin / dosen / staf login pakai akun eUniversity (API), profil disimpan di tabel akuns
         'pegawai' => [
             'driver' => 'session',
             'provider' => 'akuns',
@@ -65,19 +61,10 @@ return [
     */
 
     'providers' => [
-        'users' => [
-            'driver' => 'eloquent',
-            'model' => App\Models\User::class,
-        ],
         'akuns' => [
             'driver' => 'eloquent',
             'model' => App\Models\Akun::class,
         ],
-
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
     ],
 
     /*
@@ -95,14 +82,7 @@ return [
     |
     */
 
-    'passwords' => [
-        'users' => [
-            'provider' => 'users',
-            'table' => 'password_resets',
-            'expire' => 60,
-            'throttle' => 60,
-        ],
-    ],
+    'passwords' => [],
 
     /*
     |--------------------------------------------------------------------------

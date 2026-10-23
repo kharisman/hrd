@@ -11,12 +11,12 @@ use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('guest:web,pegawai')->group(function () {
+Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login']);
 });
 
-Route::middleware('auth:web,pegawai')->group(function () {
+Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', DashboardController::class)->name('dashboard');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
@@ -41,10 +41,6 @@ Route::middleware('auth:web,pegawai')->group(function () {
 
     Route::prefix('pengaturan')->name('pengaturan.')->controller(PengaturanController::class)->group(function () {
         Route::get('/', 'index')->name('index');
-        Route::get('admin', 'admin')->name('admin');
-        Route::post('admin', 'adminStore')->name('admin.store');
-        Route::put('admin/{user}', 'adminUpdate')->name('admin.update');
-        Route::delete('admin/{user}', 'adminDestroy')->name('admin.destroy');
         Route::get('sinkron', 'sinkron')->name('sinkron');
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');

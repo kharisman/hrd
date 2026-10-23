@@ -29,14 +29,11 @@
         <div class="card mb-3">
             <div class="card-header">Akun yang Dipakai</div>
             <div class="card-body small">
-                @if ($akun && $adaToken)
-                    Semua aksi ke eUniversity (sinkron, tambah/ubah/hapus dosen & pegawai) memakai akun yang sedang login:
-                    <strong>{{ $akun->name }}</strong> (<code>{{ $akun->username }}</code>). Tombol aktif sesuai izin (scope) akun ini.
-                @else
-                    <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                    Anda login sebagai <strong>admin lokal</strong>, jadi tidak punya akses ke eUniversity. Semua tombol yang menulis/membaca eUniversity
-                    terkunci. Login dengan akun eUniversity untuk memakainya.
-                @endif
+                Semua aksi ke eUniversity (sinkron, tambah/ubah/hapus dosen & pegawai) memakai akun yang sedang login:
+                <strong>{{ $akun->name }}</strong> (<code>{{ $akun->username }}</code>). Tombol aktif sesuai izin (scope) akun ini.
+                @unless ($adaToken)
+                    <div class="text-warning mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Sesi eUniversity tidak ditemukan, silakan keluar lalu login ulang.</div>
+                @endunless
             </div>
             <table class="table table-sm mb-0">
                 @foreach ($izin as $aksi => [$scope, $boleh])

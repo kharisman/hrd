@@ -3,16 +3,11 @@
 Aplikasi HRD (Laravel 9): data pegawai, jenjang dosen, cuti & izin.
 Semua data master **terpusat di API eUniversity**; HRD tidak terhubung ke database aplikasi lain.
 
-## Akun Admin HRD
+## Akses
 
-Admin lokal (cadangan saat eUniversity tidak bisa diakses) dibuat dari terminal:
-
-```
-php artisan hrd:admin "Nama Admin" email@palcomtech.ac.id
-```
-
-Password ditanya saat perintah dijalankan. Setelah itu kelola lewat **Pengaturan → Admin Lokal**.
-Kredensial jangan ditulis di repo; simpan di `KREDENSIAL.local.md` (diabaikan git).
+**Tidak ada akun lokal.** Semua orang masuk dengan **akun eUniversity**. Admin HRD = akun eUniversity
+dengan role `admin`/`superadmin`; atur role-nya di eUniversity, bukan di HRD. Konsekuensinya, bila server
+eUniversity tidak bisa diakses, tidak ada yang bisa login ke HRD.
 
 ## Instalasi
 
@@ -21,16 +16,15 @@ composer install
 cp .env.example .env        # isi DB_* dan PCT_API_KEY
 php artisan key:generate
 php artisan migrate
-php artisan hrd:admin "Admin HRD" admin@contoh.ac.id
 ```
+
+Lalu login dengan akun eUniversity ber-role admin, dan jalankan **Pengaturan → Sinkron eUniversity**.
 
 ## Menu
 
 - **Laporan**: Rekap Cuti, Daftar Pegawai, Daftar Dosen, Riwayat Pendidikan. Semua dengan filter & **Unduh Excel**.
-- **Pengaturan**: Jenis & Jatah Cuti, Admin Lokal, Sinkron eUniversity, Integrasi API (cek koneksi).
+- **Pengaturan**: Jenis & Jatah Cuti, Sinkron eUniversity, Integrasi API (cek koneksi).
   Daftar menu keduanya ada di `app/Support/Menu.php`.
-
-Admin lokal adalah cadangan saat API down; login di form dengan **email**.
 
 ## Login eUniversity (API)
 
@@ -58,8 +52,7 @@ semua aksi ke eUniversity; token dicabut saat logout. Tombol hanya aktif bila ak
 | Tambah / Ubah / Hapus dosen | `dosen.create` / `dosen.update` / `dosen.delete` |
 | Tambah / Ubah / Hapus pegawai | `staff.create` / `staff.update` / `staff.delete` |
 
-`*` = semua. Admin lokal tidak punya token, jadi semua aksi eUniversity terkunci baginya.
-Server juga menolak (403) bila tombol diakali. Gate: `Gate::allows('api', 'dosen.create')`.
+`*` = semua. Server juga menolak (403) bila tombol diakali. Gate: `Gate::allows('api', 'dosen.create')`.
 
 Catatan: server API wajib diberi header `User-Agent` (tanpa itu 403), dan koneksinya
 kadang timeout, jadi klien melakukan retry.
@@ -71,7 +64,7 @@ kadang timeout, jadi klien melakukan retry.
 | `hrd_staffs` = **pegawai** | API `/staff` | atasan, status kepegawaian, pendidikan |
 | `hrd_dosens` | API `/dosen` | prodi, status dosen, jabfung, angka kredit, serdos, aktif |
 | `hrd_cuti`, `hrd_jenis_cuti` | HRD | — |
-| `hrd_akuns`, `hrd_users` | login API / admin lokal | — |
+| `hrd_akuns` | profil & scope akun eUniversity yang pernah login | — |
 
 - **Atasan** tidak ada di API, jadi diisi HRD di form pegawai. Atasan inilah yang menyetujui cuti bawahannya.
 - Tambah/ubah/hapus pegawai & dosen dikirim ke API dulu, baru disimpan di HRD.

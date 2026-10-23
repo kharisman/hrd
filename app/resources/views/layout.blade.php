@@ -76,7 +76,7 @@
     </nav>
     <div class="p-3 border-top border-secondary small">
         <div class="fw-semibold">{{ auth()->user()->name }}</div>
-        <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran ?? 'admin'] }}</div>
+        <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran] }}</div>
         <form method="post" action="{{ route('logout') }}">@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
     </div>
 </aside>

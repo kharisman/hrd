@@ -27,9 +27,7 @@
                     <label class="form-label">Password</label>
                     <input name="password" type="password" class="form-control" required>
                 </div>
-                <button class="btn btn-primary w-100">Masuk</button>
-                <div class="form-text text-center mt-2">Admin lokal HRD: masuk dengan email.</div>
-            </form>
+                <button class="btn btn-primary w-100">Masuk</button>            </form>
         </div>
     </div>
 </div>

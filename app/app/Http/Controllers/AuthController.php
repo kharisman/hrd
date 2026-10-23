@@ -21,13 +21,7 @@ class AuthController extends Controller
     {
         $cred = $request->validate(['username' => 'required|string', 'password' => 'required|string']);
 
-        // 1. Admin lokal HRD (cadangan saat API down), login pakai email
-        if (auth('web')->attempt(['email' => $cred['username'], 'password' => $cred['password']])) {
-            $request->session()->regenerate();
-            return redirect()->route('dashboard');
-        }
-
-        // 2. Akun eUniversity via API
+        // Satu-satunya cara masuk: akun eUniversity via API
         try {
             $profil = $api->login($cred['username'], $cred['password']);
         } catch (ConnectionException|RequestException $e) {
@@ -71,7 +65,6 @@ class AuthController extends Controller
     public function logout(Request $request, PctApi $api)
     {
         $api->logout(session('pct_token')); // cabut token di eUniversity
-        auth('web')->logout();
         auth('pegawai')->logout();
         $request->session()->invalidate();
         return redirect()->route('login');
