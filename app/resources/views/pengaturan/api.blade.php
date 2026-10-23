@@ -6,7 +6,7 @@
 
 @section('actions')
     @can('api', 'staff.read')
-        <form method="post" action="{{ route('pengaturan.api.cek') }}" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<span class=&quot;spinner-border spinner-border-sm me-1&quot;></span>Menghubungi server...'">
+        <form method="post" action="{{ route('pengaturan.api.cek') }}">
             @csrf
             <button class="btn btn-primary"><i class="bi bi-plug me-1"></i>Cek Koneksi</button>
         </form>

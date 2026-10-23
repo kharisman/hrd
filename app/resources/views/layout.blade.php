@@ -30,9 +30,21 @@
         .batang-isi.kosong { background: #adb5bd; }
         .batang-nilai { text-align: right; font-variant-numeric: tabular-nums; color: #495057; }
         @media (min-width: 992px) { .sidebar { position: fixed; top: 0; bottom: 0; } .content { margin-left: 240px; } }
+
+        /* Bilah progres AJAX (hrd.js) */
+        #progres { position: fixed; top: 0; left: 0; height: 3px; width: 0; opacity: 0; z-index: 2000; background: #0d6efd;
+                   box-shadow: 0 0 8px rgba(13,110,253,.6); transition: width .3s ease, opacity .3s; }
+        /* Skeleton loading (komponen x-skeleton) */
+        .sk { background: linear-gradient(90deg, #eceff3 25%, #f6f7f9 37%, #eceff3 63%); background-size: 400% 100%;
+              animation: sk-kilau 1.2s ease infinite; border-radius: 4px; }
+        .sk-teks { height: 12px; } .sk-teks-kecil { height: 9px; } .sk-judul { height: 22px; }
+        .sk-input { height: 34px; flex: 1 1 150px; max-width: 220px; } .sk-tombol { height: 30px; width: 64px; }
+        @keyframes sk-kilau { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+        @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
     </style>
 </head>
 <body class="bg-light">
+<div id="progres" role="progressbar" aria-label="Memuat"></div>
 @php
     $admin = Gate::allows('admin');
     $menu = array_filter([
@@ -60,7 +72,7 @@
         <span class="fw-semibold">HRD PalComTech</span>
         <button class="btn-close btn-close-white ms-auto d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebar"></button>
     </div>
-    <nav class="nav flex-column p-2 gap-1 flex-grow-1">
+    <nav class="nav flex-column p-2 gap-1 flex-grow-1 overflow-auto" id="menu">
         @foreach ($menu as [$route, $pattern, $icon, $label])
             <a href="{{ route($route) }}" class="nav-link {{ request()->routeIs($pattern) ? 'active' : '' }}">
                 <i class="bi bi-{{ $icon }} me-2"></i>{{ $label }}
@@ -86,7 +98,7 @@
     <div class="p-3 border-top border-secondary small">
         <div class="fw-semibold">{{ auth()->user()->name }}</div>
         <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran] }}</div>
-        <form method="post" action="{{ route('logout') }}">@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
+        <form method="post" action="{{ route('logout') }}" data-no-ajax>@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
     </div>
 </aside>
 
@@ -98,6 +110,8 @@
             <span></span>
         </div>
     </nav>
+    {{-- #halaman = bagian yang ditukar oleh hrd.js saat navigasi/submit AJAX --}}
+    <div id="halaman">
     <header class="bg-white border-bottom px-3 px-lg-4 py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
             <nav aria-label="breadcrumb">
@@ -116,8 +130,12 @@
         @if ($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
         @yield('content')
     </main>
+    </div>
 </div>
+
+<template id="tplSkeleton"><x-skeleton /></template>
+<x-toast />
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));</script>
+<script src="{{ asset('js/hrd.js') }}?v={{ filemtime(public_path('js/hrd.js')) }}"></script>
 </body>
 </html>
