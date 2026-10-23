@@ -2,18 +2,17 @@
 @section('title', 'Cuti & Izin')
 
 @section('actions')
-        <a href="{{ route('cuti.create') }}" class="btn btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>
+    <a href="{{ route('cuti.create') }}" class="btn btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>
 @endsection
 
 @section('content')
 <div class="card">
-<form class="card-header bg-white row g-2 mx-0 py-3">
-    <div class="col-md-4">
-        <select name="status" class="form-select" onchange="this.form.submit()">
-            <option value="">Semua status</option>
-            @foreach (['Menunggu', 'Disetujui', 'Ditolak'] as $s)<option @selected(request('status') == $s)>{{ $s }}</option>@endforeach
-        </select>
-    </div>
+<form class="bar-filter">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+        <option value="">Semua status</option>
+        @foreach (['Menunggu', 'Disetujui', 'Ditolak'] as $s)<option @selected(request('status') == $s)>{{ $s }}</option>@endforeach
+    </select>
+    <span class="info">{{ $cuti->total() }} pengajuan</span>
 </form>
 <div class="table-responsive">
 <table class="table mb-0 align-middle">

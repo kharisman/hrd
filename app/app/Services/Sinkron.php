@@ -23,15 +23,23 @@ class Sinkron
         $staff = collect($data['/staff']);
         $dosen = collect($data['/dosen']);
 
+        // /staff tidak punya status aktif → pakai StatusLogin akun login staff (/users). Bila endpoint ini
+        // tidak bisa dibaca (izin), status pegawai tidak diubah.
+        $statusLogin = rescue(fn () => collect($this->api->ambilSemua(['/users'], ['tipe_user' => 'staff'])['/users'])
+            ->mapWithKeys(fn ($u) => [strtolower($u['Username']) => $u['StatusLogin']]), null, false);
+
         $stat = [
-            'staff_api' => $staff->count(), 'staff_dihapus' => 0,
+            'staff_api' => $staff->count(), 'staff_aktif' => 0, 'staff_dihapus' => 0,
             'dosen_api' => $dosen->count(), 'dosen_baru' => 0, 'dosen_diperbarui' => 0, 'dosen_tertaut_pegawai' => 0, 'nidn_bentrok' => 0,
         ];
 
-        DB::transaction(function () use ($staff, $dosen, &$stat) {
+        DB::transaction(function () use ($staff, $dosen, $statusLogin, &$stat) {
             // 1. Master pegawai (hrd_staffs). Isian HRD (atasan, status, pendidikan) tidak ikut di-fill.
             foreach ($staff as $s) {
-                Staff::updateOrCreate(['api_id' => $s['idStaff']], $this->biodata($s) + [
+                Staff::updateOrCreate(['api_id' => $s['idStaff']], $this->biodata($s) + ($statusLogin ? [
+                    // tanpa akun login sama sekali = tidak aktif
+                    'aktif' => ($statusLogin[strtolower($s['Username'] ?? '')] ?? null) === 'aktif',
+                ] : []) + [
                     'nip' => $this->bersih($s['Nip'] ?? null),
                     'nama' => trim($s['Nama']),
                     'username' => $s['Username'] ?: null,
@@ -109,6 +117,7 @@ class Sinkron
                 $row->save();
             }
             $stat['dosen_tertaut_pegawai'] = Dosen::whereNotNull('staff_id')->count();
+            $stat['staff_aktif'] = Staff::aktif()->count();
 
             // 3. Akun yang pernah login: perbarui tautan ke pegawai & dosen (username sama)
             foreach (Akun::all() as $akun) {

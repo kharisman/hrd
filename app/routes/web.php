@@ -5,6 +5,8 @@ use App\Http\Controllers\CutiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DosenController;
 use App\Http\Controllers\JenisCutiController;
+use App\Http\Controllers\JenisPengajuanController;
+use App\Http\Controllers\PengajuanController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\RiwayatController;
@@ -20,7 +22,8 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', DashboardController::class)->name('dashboard');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
-    Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan');
+    Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
+    Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');
     Route::resource('pegawai', StaffController::class)->parameters(['pegawai' => 'staff'])->names('staff');
     Route::post('dosen/sinkron', [DosenController::class, 'sinkron'])->name('dosen.sinkron');
     Route::resource('dosen', DosenController::class);
@@ -37,6 +40,7 @@ Route::middleware('auth')->group(function () {
         Route::get('pegawai', 'pegawai')->name('pegawai');
         Route::get('dosen', 'dosen')->name('dosen');
         Route::get('pendidikan', 'pendidikan')->name('pendidikan');
+        Route::get('pengajuan', 'pengajuan')->name('pengajuan');
     });
 
     Route::prefix('pengaturan')->name('pengaturan.')->controller(PengaturanController::class)->group(function () {
@@ -45,6 +49,12 @@ Route::middleware('auth')->group(function () {
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');
     });
+
+    Route::resource('pengajuan', PengajuanController::class)->only('index', 'create', 'store', 'show');
+    Route::post('pengajuan/{pengajuan}/proses', [PengajuanController::class, 'proses'])->name('pengajuan.proses');
+    Route::post('pengajuan/{pengajuan}/batal', [PengajuanController::class, 'batal'])->name('pengajuan.batal');
+    Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');
+    Route::resource('jenis-pengajuan', JenisPengajuanController::class)->except('show', 'destroy');
 
     Route::post('cuti/{cuti}/proses', [CutiController::class, 'proses'])->name('cuti.proses');
 });

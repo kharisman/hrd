@@ -34,7 +34,7 @@ class CutiController extends Controller
             return redirect()->route('cuti.index')->withErrors('Akun Anda belum tertaut ke data pegawai, belum bisa mengajukan cuti. Hubungi HRD.');
         }
         // Admin bisa mengajukan atas nama pegawai
-        $pegawai = $this->isAdmin() ? Staff::orderBy('nama')->get(['id', 'nama', 'nip', 'divisi']) : null;
+        $pegawai = $this->isAdmin() ? Staff::aktif()->orderBy('nama')->get(['id', 'nama', 'nip', 'divisi']) : null;
         // Rekap jatah: milik sendiri, atau pegawai yang dipilih admin (?staff_id=)
         $staffId = $this->isAdmin() ? request()->integer('staff_id') : $this->myStaffId();
         $rekap = JenisCuti::rekap($staffId ?: 0);

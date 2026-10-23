@@ -10,15 +10,13 @@
 
 @section('content')
 <div class="card">
-<form class="card-header bg-white row g-2 mx-0 py-3">
+<form class="bar-filter">
     @foreach ($filter as [$nama, $label, $opsi, $nilai])
-        <div class="col-md-3">
-            <select name="{{ $nama }}" class="form-select" onchange="this.form.submit()" aria-label="{{ $label }}">
-                @foreach ($opsi as $v => $teks)<option value="{{ $v }}" @selected((string) $nilai === (string) $v)>{{ $teks }}</option>@endforeach
-            </select>
-        </div>
+        <select name="{{ $nama }}" class="form-select" onchange="this.form.submit()" aria-label="{{ $label }}">
+            @foreach ($opsi as $v => $teks)<option value="{{ $v }}" @selected((string) $nilai === (string) $v)>{{ $teks }}</option>@endforeach
+        </select>
     @endforeach
-    <div class="col text-md-end align-self-center small text-muted">{{ $baris->count() }} baris</div>
+    <span class="info">{{ $baris->count() }} baris</span>
 </form>
 <div class="table-responsive" style="max-height:70vh">
 <table class="table table-sm table-hover table-bordered mb-0 align-middle small">

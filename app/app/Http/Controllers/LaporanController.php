@@ -60,16 +60,19 @@ class LaporanController extends Controller
 
     public function pegawai(Request $r)
     {
+        $aktif = $r->input('aktif', '1');
         $baris = Staff::with('atasan')
+            ->when($aktif !== 'semua', fn ($q) => $q->where('aktif', $aktif))
             ->when($r->divisi, fn ($q, $v) => $q->where('id_divisi', $v))
             ->when($r->level, fn ($q, $v) => $q->where('id_level', $v))
             ->orderBy('divisi')->orderBy('nama')->get()
-            ->map(fn ($s) => [$s->nip, $s->nama, $s->username, $s->divisi, $s->level, $s->atasan->nama ?? '', $s->status_kepegawaian,
+            ->map(fn ($s) => [$s->nip, $s->nama, $s->username, $s->aktif ? 'Aktif' : 'Nonaktif', $s->divisi, $s->level, $s->atasan->nama ?? '', $s->status_kepegawaian,
                 $s->pendidikan_terakhir, $s->mulai_kerja?->format('d-m-Y'), ['L' => 'L', 'P' => 'P'][$s->jenis_kelamin] ?? '', $s->no_hp]);
 
         return $this->tampil($r, 'Daftar Pegawai',
-            ['NIP', 'Nama', 'Username', 'Divisi', 'Level', 'Atasan', 'Status', 'Pendidikan', 'Mulai Kerja', 'L/P', 'No. HP'],
+            ['NIP', 'Nama', 'Username', 'Aktif', 'Divisi', 'Level', 'Atasan', 'Status', 'Pendidikan', 'Mulai Kerja', 'L/P', 'No. HP'],
             $baris, [
+                ['aktif', 'Status', ['1' => 'Aktif', '0' => 'Nonaktif', 'semua' => 'Aktif & nonaktif'], $aktif],
                 ['divisi', 'Divisi', ['' => 'Semua divisi'] + $this->divisi(), $r->divisi],
                 ['level', 'Level', ['' => 'Semua level'] + Staff::whereNotNull('id_level')->orderBy('level')->pluck('level', 'id_level')->all(), $r->level],
             ]);
@@ -110,6 +113,28 @@ class LaporanController extends Controller
                 ['status', 'Status', ['' => 'Semua status'] + array_combine(RiwayatPendidikan::STATUS, RiwayatPendidikan::STATUS), $r->status],
                 ['jenjang', 'Jenjang', ['' => 'Semua jenjang'] + array_combine(RiwayatPendidikan::JENJANG, RiwayatPendidikan::JENJANG), $r->jenjang],
             ]);
+    }
+
+    // Jumlah pengajuan per jenis × status dalam satu tahun
+    public function pengajuan(Request $r)
+    {
+        $tahun = $r->integer('tahun') ?: now()->year;
+        $hitung = \App\Models\Pengajuan::whereYear('created_at', $tahun)
+            ->selectRaw('jenis_pengajuan_id, status, count(*) n')->groupBy('jenis_pengajuan_id', 'status')
+            ->toBase()->get()->groupBy('jenis_pengajuan_id');
+        $status = \App\Models\Pengajuan::STATUS;
+
+        $baris = \App\Models\JenisPengajuan::orderBy('urutan')
+            ->when($r->kategori, fn ($q, $v) => $q->where('kategori', $v))->get()
+            ->map(function ($j) use ($hitung, $status) {
+                $per = ($hitung[$j->id] ?? collect())->pluck('n', 'status');
+                return array_merge([$j->nama, $j->kategori], array_map(fn ($s) => (int) ($per[$s] ?? 0), $status), [(int) $per->sum()]);
+            });
+
+        return $this->tampil($r, 'Rekap Pengajuan ' . $tahun, array_merge(['Jenis', 'Kategori'], $status, ['Total']), $baris, [
+            ['tahun', 'Tahun', array_combine($t = range(now()->year, now()->year - 4), $t), $tahun],
+            ['kategori', 'Kategori', ['' => 'Semua kategori'] + array_combine(\App\Models\JenisPengajuan::KATEGORI, \App\Models\JenisPengajuan::KATEGORI), $r->kategori],
+        ], 'Dihitung dari tanggal pengajuan dibuat.');
     }
 
     // ---- bersama ----

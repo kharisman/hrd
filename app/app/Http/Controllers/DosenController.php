@@ -45,7 +45,7 @@ class DosenController extends Controller
             report($e);
             return back()->withErrors('Sinkron gagal: server eUniversity tidak bisa dihubungi. Coba lagi nanti.');
         }
-        return back()->with('ok', "Sinkron selesai: {$s['staff_api']} pegawai & {$s['dosen_api']} dosen dari API "
+        return back()->with('ok', "Sinkron selesai: {$s['staff_api']} pegawai ({$s['staff_aktif']} aktif) & {$s['dosen_api']} dosen dari API "
             . "({$s['dosen_baru']} dosen baru, {$s['dosen_diperbarui']} diperbarui, {$s['dosen_tertaut_pegawai']} tertaut pegawai).");
     }
 
@@ -144,6 +144,8 @@ class DosenController extends Controller
     private function pilihanPegawai(?int $kecuali = null)
     {
         $sudah = Dosen::whereNotNull('staff_id')->when($kecuali, fn ($q) => $q->where('staff_id', '!=', $kecuali))->pluck('staff_id');
-        return Staff::whereNotIn('id', $sudah)->orderBy('nama')->get(['id', 'nama', 'nip', 'divisi']);
+        // Pegawai aktif, plus pegawai yang sedang tertaut (supaya tidak hilang dari pilihan)
+        return Staff::whereNotIn('id', $sudah)->where(fn ($q) => $q->where('aktif', true)->orWhere('id', $kecuali))
+            ->orderBy('nama')->get(['id', 'nama', 'nip', 'divisi']);
     }
 }

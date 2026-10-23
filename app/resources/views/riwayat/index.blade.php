@@ -29,25 +29,19 @@
 </div>
 
 <div class="card">
-<form class="card-header bg-white row g-2 mx-0 py-3">
-    <div class="col-md-3">
-        <select name="status" class="form-select" onchange="this.form.submit()">
-            @foreach (\App\Models\RiwayatPendidikan::STATUS as $o)<option @selected(request('status', 'Sedang Studi Lanjut') == $o)>{{ $o }}</option>@endforeach
-        </select>
-    </div>
-    <div class="col-md-3">
-        <select name="jenjang" class="form-select" onchange="this.form.submit()">
-            <option value="">Semua jenjang</option>
-            @foreach (\App\Models\RiwayatPendidikan::JENJANG as $o)<option @selected(request('jenjang') == $o)>{{ $o }}</option>@endforeach
-        </select>
-    </div>
-    <div class="col-md-3">
-        <select name="pembiayaan" class="form-select" onchange="this.form.submit()">
-            <option value="">Semua pembiayaan</option>
-            @foreach (\App\Models\RiwayatPendidikan::PEMBIAYAAN as $o)<option @selected(request('pembiayaan') == $o)>{{ $o }}</option>@endforeach
-        </select>
-    </div>
-    <div class="col-md-3 text-md-end align-self-center small text-muted">{{ $studi->total() }} data</div>
+<form class="bar-filter">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+        @foreach (\App\Models\RiwayatPendidikan::STATUS as $o)<option @selected(request('status', 'Sedang Studi Lanjut') == $o)>{{ $o }}</option>@endforeach
+    </select>
+    <select name="jenjang" class="form-select" onchange="this.form.submit()">
+        <option value="">Semua jenjang</option>
+        @foreach (\App\Models\RiwayatPendidikan::JENJANG as $o)<option @selected(request('jenjang') == $o)>{{ $o }}</option>@endforeach
+    </select>
+    <select name="pembiayaan" class="form-select" onchange="this.form.submit()">
+        <option value="">Semua pembiayaan</option>
+        @foreach (\App\Models\RiwayatPendidikan::PEMBIAYAAN as $o)<option @selected(request('pembiayaan') == $o)>{{ $o }}</option>@endforeach
+    </select>
+    <span class="info">{{ $studi->total() }} data</span>
 </form>
 <div class="table-responsive">
 <table class="table table-hover mb-0 align-middle">

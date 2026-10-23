@@ -31,7 +31,9 @@ class StaffController extends Controller
                 : redirect()->route('dashboard')->withErrors('Akun Anda belum tertaut ke data pegawai eUniversity. Hubungi HRD.');
         }
 
+        $status = $request->input('status', 'aktif'); // default hanya pegawai aktif
         $staff = Staff::with('atasan')
+            ->when($status !== 'semua', fn ($q) => $q->where('aktif', $status === 'aktif'))
             ->when($request->divisi, fn ($q, $v) => $q->where('id_divisi', $v))
             ->when($request->level, fn ($q, $v) => $q->where('id_level', $v))
             ->when($request->atasan === 'kosong', fn ($q) => $q->whereNull('atasan_id'))
@@ -43,22 +45,51 @@ class StaffController extends Controller
         return view('staff.index', ['staff' => $staff] + $this->pilihan());
     }
 
-    // Atur atasan banyak pegawai sekaligus dari daftar (centang). Atasan kosong = lepas atasan.
+    // Halaman Atasan & Bawahan: pilih atasan → lihat bawahannya → tambah/lepas bawahan sekaligus banyak.
     // Data divisi/level di eUniversity tidak cukup rapi untuk pengisian otomatis (satu akun bisa ada di banyak divisi).
+    public function atasan(Request $request)
+    {
+        $atasan = $request->atasan ? Staff::find($request->atasan) : null;
+        // Bawahan tampil semua (yang nonaktif ditandai, supaya bisa dilepas); calon atasan & kandidat hanya yang aktif
+        $bawahan = $atasan ? Staff::where('atasan_id', $atasan->id)->orderByDesc('aktif')->orderBy('divisi')->orderBy('nama')->get() : collect();
+
+        $kandidat = $atasan ? Staff::with('atasan')->aktif()
+            ->where('id', '!=', $atasan->id)
+            ->where(fn ($q) => $q->whereNull('atasan_id')->orWhere('atasan_id', '!=', $atasan->id))
+            ->when($request->divisi, fn ($q, $v) => $q->where('id_divisi', $v))
+            ->when($request->level, fn ($q, $v) => $q->where('id_level', $v))
+            ->when($request->boolean('kosong'), fn ($q) => $q->whereNull('atasan_id'))
+            ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w->where('nama', 'like', "%$s%")->orWhere('nip', 'like', "%$s%")->orWhere('username', 'like', "%$s%")))
+            ->orderBy('nama')->paginate(50)->withQueryString() : null;
+
+        return view('staff.atasan', compact('atasan', 'bawahan', 'kandidat') + [
+            'semua' => Staff::aktif()->withCount('bawahan')->orderBy('nama')->get(['id', 'nama', 'level', 'divisi']),
+            'tanpaAtasan' => Staff::aktif()->whereNull('atasan_id')->count(),
+        ] + $this->pilihan());
+    }
+
+    // Simpan: pegawai[] dijadikan bawahan atasan_id (kosong = lepas atasan)
     public function aturAtasan(Request $request)
     {
         $data = $request->validate([
             'pegawai' => 'required|array|min:1',
             'pegawai.*' => 'integer',
             'atasan_id' => ['nullable', Rule::exists('staffs', 'id')],
-        ], ['pegawai.required' => 'Centang dulu pegawai yang mau diatur atasannya.']);
+        ], ['pegawai.required' => 'Centang dulu pegawai yang mau diatur.']);
 
-        // Atasan tidak boleh dirinya sendiri
-        $ids = collect($data['pegawai'])->reject(fn ($id) => $id == $data['atasan_id']);
+        // Cegah lingkaran: atasan sendiri & semua atasan di atasnya tidak boleh dijadikan bawahannya
+        $terlarang = [];
+        for ($id = $data['atasan_id']; $id && !in_array($id, $terlarang); $id = Staff::whereKey($id)->value('atasan_id')) {
+            $terlarang[] = $id;
+        }
+        $ids = collect($data['pegawai'])->reject(fn ($id) => in_array($id, $terlarang));
         $n = Staff::whereIn('id', $ids)->update(['atasan_id' => $data['atasan_id']]);
+        $dilewati = count($data['pegawai']) - $ids->count();
 
-        $atasan = $data['atasan_id'] ? Staff::find($data['atasan_id'])->nama : 'kosong';
-        return back()->with('ok', "Atasan {$n} pegawai diatur ke: {$atasan}.");
+        $pesan = $data['atasan_id']
+            ? "{$n} pegawai dijadikan bawahan dari: " . Staff::find($data['atasan_id'])->nama
+            : "Atasan {$n} pegawai dilepas";
+        return back()->with('ok', $pesan . ($dilewati ? " — {$dilewati} dilewati karena atasan tidak boleh menjadi bawahan dari bawahannya sendiri." : ''));
     }
 
     public function show(Staff $staff)
@@ -147,7 +178,9 @@ class StaffController extends Controller
         return [
             'divisiList' => Staff::whereNotNull('id_divisi')->orderBy('divisi')->pluck('divisi', 'id_divisi'),
             'levelList' => Staff::whereNotNull('id_level')->orderBy('level')->pluck('level', 'id_level'),
-            'atasanList' => Staff::when($kecuali, fn ($q) => $q->where('id', '!=', $kecuali->id))->orderBy('nama')->get(['id', 'nama', 'divisi', 'level']),
+            // Calon atasan: pegawai aktif (+ atasan yang sedang terpasang, supaya tidak hilang dari pilihan)
+            'atasanList' => Staff::where(fn ($q) => $q->where('aktif', true)->orWhere('id', $kecuali?->atasan_id))
+                ->when($kecuali, fn ($q) => $q->where('id', '!=', $kecuali->id))->orderBy('nama')->get(['id', 'nama', 'divisi', 'level']),
         ];
     }
 }

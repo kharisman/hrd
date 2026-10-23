@@ -12,6 +12,13 @@
         .sidebar .nav-link { color: #cfd8e3; border-radius: .375rem; }
         .sidebar .nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
         .sidebar .nav-link.active { background: #0d6efd; color: #fff; }
+        /* Bar filter di atas tabel/daftar: satu gaya untuk semua halaman */
+        .bar-filter { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .75rem 1rem; background: #fff; border-bottom: 1px solid var(--bs-border-color); border-radius: var(--bs-card-inner-border-radius) var(--bs-card-inner-border-radius) 0 0; }
+        .bar-filter > .form-select { width: auto; flex: 1 1 150px; max-width: 220px; }
+        .bar-filter > .input-group { flex: 2 1 220px; max-width: 320px; }
+        .bar-filter > .form-check { margin: 0 .25rem; }
+        .bar-filter > .info { margin-left: auto; font-size: .875rem; color: var(--bs-secondary-color); white-space: nowrap; }
+
         /* Dashboard: kartu angka & grafik batang horizontal */
         .kartu { transition: box-shadow .15s; }
         .kartu:hover { box-shadow: 0 .25rem .75rem rgba(0,0,0,.08); }
@@ -30,10 +37,12 @@
     $admin = Gate::allows('admin');
     $menu = array_filter([
         ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
-        ['staff.index', 'staff*', 'people', $admin ? 'Data Pegawai' : 'Profil Saya'],
+        ['staff.index', ['staff.index', 'staff.show', 'staff.create', 'staff.edit'], 'people', $admin ? 'Data Pegawai' : 'Profil Saya'],
+        $admin ? ['staff.atasan', 'staff.atasan*', 'diagram-3', 'Atasan & Bawahan'] : null,
         $admin ? ['dosen.index', 'dosen*', 'mortarboard', 'Data Dosen'] : null,
         $admin ? ['riwayat.index', 'riwayat*', 'journal-bookmark', 'Studi Lanjut'] : null,
         ['cuti.index', 'cuti.*', 'calendar-check', 'Cuti & Izin'],
+        ['pengajuan.index', 'pengajuan.*', 'ui-checks', 'Pengajuan'],
     ]);
     // Grup yang bisa dilipat: [id, judul, ikon, route induk, item]
     // Item aktif: route-nya sendiri; untuk *.index juga semua turunannya (mis. jenis-cuti.*)

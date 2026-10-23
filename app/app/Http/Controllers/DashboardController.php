@@ -27,7 +27,7 @@ class DashboardController extends Controller
 
         return view('dashboard.admin', [
             'kartu' => [
-                ['Pegawai', Staff::count(), 'people', route('staff.index'), 'akun staff eUniversity'],
+                ['Pegawai aktif', Staff::aktif()->count(), 'people', route('staff.index'), 'dari ' . Staff::count() . ' akun staff'],
                 ['Dosen aktif', (clone $dosenAktif)->count(), 'mortarboard', route('dosen.index'), 'dari ' . Dosen::count() . ' dosen terdaftar'],
                 ['Cuti menunggu', Cuti::where('status', 'Menunggu')->count(), 'hourglass-split', route('cuti.index', ['status' => 'Menunggu']), 'perlu persetujuan'],
                 ['Sedang cuti', Cuti::where('status', 'Disetujui')->whereDate('tgl_mulai', '<=', $hariIni)->whereDate('tgl_selesai', '>=', $hariIni)->count(), 'calendar-x', route('cuti.index', ['status' => 'Disetujui']), 'hari ini'],
@@ -35,7 +35,8 @@ class DashboardController extends Controller
             ],
             'tindakan' => [
                 ['Cuti menunggu persetujuan', Cuti::where('status', 'Menunggu')->count(), route('cuti.index', ['status' => 'Menunggu'])],
-                ['Pegawai belum punya atasan', Staff::whereNull('atasan_id')->count(), route('staff.index', ['atasan' => 'kosong'])],
+                ['Pengajuan menunggu HRD', \App\Models\Pengajuan::where('status', \App\Models\Pengajuan::MENUNGGU_HRD)->count(), route('pengajuan.index', ['tab' => 'semua', 'status' => \App\Models\Pengajuan::MENUNGGU_HRD])],
+                ['Pegawai aktif belum punya atasan', Staff::aktif()->whereNull('atasan_id')->count(), route('staff.atasan')],
                 ['Dosen aktif tanpa jabatan fungsional', (clone $dosenAktif)->whereNull('jabatan_fungsional')->count(), route('dosen.index')],
                 ['Studi lanjut lewat target lulus', RiwayatPendidikan::where('status', 'Sedang Studi Lanjut')->where('tahun_lulus', '<', now()->year)->count(), route('riwayat.index')],
             ],
@@ -44,7 +45,7 @@ class DashboardController extends Controller
             'akanCuti' => Cuti::with('staff', 'jenisCuti')->where('status', 'Disetujui')
                 ->whereDate('tgl_selesai', '>=', $hariIni)->whereDate('tgl_mulai', '<=', now()->addDays(7))
                 ->orderBy('tgl_mulai')->limit(8)->get(),
-            'perDivisi' => $hitung(Staff::query(), 'divisi', 'Tanpa divisi'),
+            'perDivisi' => $hitung(Staff::aktif(), 'divisi', 'Tanpa divisi'),
             'jabfung' => $hitung(clone $dosenAktif, 'jabatan_fungsional', 'Belum diisi'),
             'pendidikan' => $hitung(clone $dosenAktif, 'pendidikan_terakhir', 'Belum diisi'),
         ]);
@@ -63,6 +64,7 @@ class DashboardController extends Controller
             'jatah' => $me ? JenisCuti::rekap($me) : collect(),
             'cutiSaya' => $me ? Cuti::with('jenisCuti')->where('staff_id', $me)->latest()->limit(5)->get() : collect(),
             'cutiBawahan' => Cuti::with('staff', 'jenisCuti')->whereIn('staff_id', $bawahan)->where('status', 'Menunggu')->orderBy('tgl_mulai')->get(),
+            'pengajuanBawahan' => \App\Models\Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', \App\Models\Pengajuan::MENUNGGU_ATASAN)->count(),
             'jumlahBawahan' => $bawahan->count(),
         ]);
     }

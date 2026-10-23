@@ -87,14 +87,14 @@ class PctApi
      * Ambil seluruh baris (semua halaman) beberapa endpoint.
      * @return array<string, array> [path => rows]
      */
-    public function ambilSemua(array $paths): array
+    public function ambilSemua(array $paths, array $query = []): array
     {
         $hasil = [];
         foreach ($paths as $path) {
             $hasil[$path] = [];
             $page = 1;
             do {
-                $res = $this->cek($this->http($this->token(), 8, 3000)->get($path, ['per_page' => 100, 'page' => $page]));
+                $res = $this->cek($this->http($this->token(), 8, 3000)->get($path, $query + ['per_page' => 100, 'page' => $page]));
                 array_push($hasil[$path], ...($res->json('data') ?? []));
             } while ($page++ < $res->json('meta.last_page', 1));
         }

@@ -13,6 +13,7 @@ class Menu
             ['laporan.pegawai', 'people', 'Daftar Pegawai', 'Pegawai per divisi & level, atasan, status kepegawaian'],
             ['laporan.dosen', 'mortarboard', 'Daftar Dosen', 'Dosen beserta NIDN, jabatan fungsional, pendidikan, serdos'],
             ['laporan.pendidikan', 'journal-bookmark', 'Riwayat Pendidikan', 'Seluruh riwayat pendidikan & studi lanjut'],
+            ['laporan.pengajuan', 'ui-checks', 'Rekap Pengajuan', 'Jumlah pengajuan per jenis & status'],
         ];
     }
 
@@ -20,6 +21,7 @@ class Menu
     {
         return [
             ['jenis-cuti.index', 'sliders', 'Jenis & Jatah Cuti', 'Jenis cuti dan jatah hari per tahun'],
+            ['jenis-pengajuan.index', 'ui-checks', 'Jenis Pengajuan', 'Form pengajuan pegawai: isian & alur persetujuan'],
             ['pengaturan.sinkron', 'arrow-repeat', 'Sinkron eUniversity', 'Tarik data pegawai & dosen dari API'],
             ['pengaturan.api', 'plug', 'Integrasi API', 'Alamat API, akun layanan, pemetaan role, cek koneksi'],
         ];

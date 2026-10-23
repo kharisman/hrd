@@ -12,32 +12,24 @@
 
 @section('content')
 <div class="card">
-<form class="card-header bg-white row g-2 mx-0 py-3">
-    <div class="col-md-2">
-        <select name="prodi" class="form-select" onchange="this.form.submit()">
-            <option value="">Semua prodi</option>
-            @foreach (\App\Models\Dosen::PRODI as $p)<option @selected(request('prodi') == $p)>{{ $p }}</option>@endforeach
-        </select>
+<form class="bar-filter">
+    <select name="aktif" class="form-select" onchange="this.form.submit()">
+        <option value="1">Aktif</option>
+        <option value="0" @selected(request('aktif') === '0')>Nonaktif</option>
+    </select>
+    <select name="prodi" class="form-select" onchange="this.form.submit()">
+        <option value="">Semua prodi</option>
+        @foreach (\App\Models\Dosen::PRODI as $p)<option @selected(request('prodi') == $p)>{{ $p }}</option>@endforeach
+    </select>
+    <select name="jabfung" class="form-select" onchange="this.form.submit()">
+        <option value="">Semua jabfung</option>
+        @foreach (\App\Models\Dosen::JENJANG as $j)<option @selected(request('jabfung') == $j)>{{ $j }}</option>@endforeach
+    </select>
+    <div class="input-group">
+        <input name="q" value="{{ request('q') }}" class="form-control" placeholder="Cari nama / NIDN">
+        <button class="btn btn-primary"><i class="bi bi-search"></i></button>
     </div>
-    <div class="col-md-2">
-        <select name="jabfung" class="form-select" onchange="this.form.submit()">
-            <option value="">Semua jabfung</option>
-            @foreach (\App\Models\Dosen::JENJANG as $j)<option @selected(request('jabfung') == $j)>{{ $j }}</option>@endforeach
-        </select>
-    </div>
-    <div class="col-md-2">
-        <select name="aktif" class="form-select" onchange="this.form.submit()">
-            <option value="1">Aktif</option>
-            <option value="0" @selected(request('aktif') === '0')>Nonaktif</option>
-        </select>
-    </div>
-    <div class="col-md-4">
-        <div class="input-group">
-            <input name="q" value="{{ request('q') }}" class="form-control" placeholder="Cari nama / NIDN">
-            <button class="btn btn-primary"><i class="bi bi-search"></i></button>
-        </div>
-    </div>
-    <div class="col-md-2 text-md-end align-self-center small text-muted">{{ $dosen->total() }} dosen</div>
+    <span class="info">{{ $dosen->total() }} dosen</span>
 </form>
 <div class="table-responsive">
 <table class="table table-hover mb-0 align-middle">

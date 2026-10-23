@@ -23,6 +23,13 @@
     </div>
 </div>
 
+@if ($pengajuanBawahan)
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan bawahan (dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>
+    <a href="{{ route('pengajuan.index', ['tab' => 'atasan']) }}" class="btn btn-sm btn-warning">Proses</a>
+</div>
+@endif
+
 @if ($cutiBawahan->isNotEmpty())
 <div class="alert alert-warning d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bell me-1"></i> <strong>{{ $cutiBawahan->count() }}</strong> pengajuan cuti bawahan menunggu persetujuan Anda.</span>
