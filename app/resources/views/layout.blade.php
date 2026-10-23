@@ -72,7 +72,8 @@
         <span class="fw-semibold">HRD PalComTech</span>
         <button class="btn-close btn-close-white ms-auto d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebar"></button>
     </div>
-    <nav class="nav flex-column p-2 gap-1 flex-grow-1 overflow-auto" id="menu">
+    {{-- flex-nowrap: tanpa ini .nav melipat ke kolom kedua saat menu lebih tinggi dari layar --}}
+    <nav class="nav flex-column flex-nowrap p-2 gap-1 flex-grow-1 overflow-y-auto overflow-x-hidden" id="menu" style="min-height:0">
         @foreach ($menu as [$route, $pattern, $icon, $label])
             <a href="{{ route($route) }}" class="nav-link {{ request()->routeIs($pattern) ? 'active' : '' }}">
                 <i class="bi bi-{{ $icon }} me-2"></i>{{ $label }}

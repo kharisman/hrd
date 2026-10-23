@@ -157,8 +157,12 @@ const HRD = (() => {
     function tukar(doc, baru) {
         document.title = doc.title;
         document.getElementById('halaman').replaceWith(baru);
-        const menuBaru = doc.getElementById('menu');
-        if (menuBaru) document.getElementById('menu')?.replaceWith(menuBaru);
+        const menuLama = document.getElementById('menu'), menuBaru = doc.getElementById('menu');
+        if (menuLama && menuBaru) {
+            const posisi = menuLama.scrollTop;          // pertahankan posisi scroll sidebar
+            menuLama.replaceWith(menuBaru);
+            menuBaru.scrollTop = posisi;
+        }
         bootstrap.Offcanvas.getInstance(document.getElementById('sidebar'))?.hide();
         jalankanSkrip(baru);
         inisialisasi(baru);
