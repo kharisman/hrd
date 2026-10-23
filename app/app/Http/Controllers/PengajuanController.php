@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JenisPengajuan;
 use App\Models\Pengajuan;
+use App\Models\Pengaturan;
 use App\Models\Staff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -111,7 +112,10 @@ class PengajuanController extends Controller
             "{$tahap}_catatan" => $d['catatan'] ?? null,
             'status' => !$setuju ? 'Ditolak' : ($tahap === 'atasan' ? $pengajuan->statusSetelahAtasan() : 'Disetujui'),
         ]);
-        return back()->with('ok', "Pengajuan {$pengajuan->status}.");
+        if ($pengajuan->status === 'Disetujui') {
+            $pengajuan->sahkan(); // nomor surat + QR tanda tangan
+        }
+        return back()->with('ok', "Pengajuan {$pengajuan->status}." . ($pengajuan->nomor ? " Nomor: {$pengajuan->nomor}" : ''));
     }
 
     // Pengaju membatalkan selama belum selesai diproses
@@ -120,6 +124,32 @@ class PengajuanController extends Controller
         abort_unless($pengajuan->staff_id === $this->myStaffId() && !$pengajuan->selesai(), 403);
         $pengajuan->update(['status' => 'Dibatalkan']);
         return back()->with('ok', 'Pengajuan dibatalkan.');
+    }
+
+    // PDF pengajuan. Disetujui → tanda tangan pejabat Rektor berupa QR menuju halaman validasi publik.
+    public function pdf(Pengajuan $pengajuan)
+    {
+        abort_unless($this->bolehLihat($pengajuan), 403);
+        $pengajuan->load('jenis', 'staff');
+
+        $qr = $pengajuan->kode_validasi
+            ? base64_encode(\Endroid\QrCode\Builder\Builder::create()
+                ->data(route('validasi', $pengajuan->kode_validasi))->size(240)->margin(0)->build()->getString())
+            : null;
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pengajuan.pdf', [
+            'p' => $pengajuan,
+            'qr' => $qr,
+            'logo' => base64_encode(file_get_contents(public_path('logo-pct1.png'))),
+            'pengaju' => $pengajuan->namaPengaju($this->myStaffId()),
+            'kota' => Pengaturan::nilai('kota', 'Palembang'),
+        ])->setPaper('a4')->stream('Pengajuan-' . str_replace('/', '-', $pengajuan->nomor ?? $pengajuan->id) . '.pdf');
+    }
+
+    // Halaman validasi publik (tujuan QR). Hanya ringkasan; isi rinci tidak ditampilkan.
+    public function validasi(string $kode)
+    {
+        return view('pengajuan.validasi', ['p' => Pengajuan::with('jenis', 'staff')->where('kode_validasi', $kode)->first()]);
     }
 
     // Berkas lampiran disimpan privat

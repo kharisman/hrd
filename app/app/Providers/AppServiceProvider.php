@@ -16,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Paginator::useBootstrapFive();
+        config(['dompdf.public_path' => public_path()]); // dompdf default ke folder public, di sini public_html
         \Illuminate\Support\Carbon::setLocale('id'); // nama bulan & "x hari yang lalu" dalam Bahasa Indonesia
     }
 }

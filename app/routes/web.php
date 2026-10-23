@@ -13,6 +13,9 @@ use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
+// Halaman publik tujuan QR tanda tangan (tanpa login). Dibatasi 30 permintaan/menit supaya kode tidak bisa ditebak beruntun.
+Route::get('validasi/{kode}', [PengajuanController::class, 'validasi'])->middleware('throttle:30,1')->name('validasi');
+
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login']);
@@ -45,6 +48,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('pengaturan')->name('pengaturan.')->controller(PengaturanController::class)->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('dokumen', 'dokumen')->name('dokumen');
+        Route::post('dokumen', 'simpanDokumen')->name('dokumen.simpan');
         Route::get('sinkron', 'sinkron')->name('sinkron');
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');
@@ -53,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('pengajuan', PengajuanController::class)->only('index', 'create', 'store', 'show');
     Route::post('pengajuan/{pengajuan}/proses', [PengajuanController::class, 'proses'])->name('pengajuan.proses');
     Route::post('pengajuan/{pengajuan}/batal', [PengajuanController::class, 'batal'])->name('pengajuan.batal');
+    Route::get('pengajuan/{pengajuan}/pdf', [PengajuanController::class, 'pdf'])->name('pengajuan.pdf');
     Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');
     Route::resource('jenis-pengajuan', JenisPengajuanController::class)->except('show', 'destroy');
 

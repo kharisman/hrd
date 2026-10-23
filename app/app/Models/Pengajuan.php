@@ -11,7 +11,8 @@ class Pengajuan extends Model
     protected $connection = 'mysql';
     protected $table = 'pengajuan';
     protected $guarded = ['id'];
-    protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'atasan_at' => 'datetime', 'hrd_at' => 'datetime'];
+    protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'atasan_at' => 'datetime', 'hrd_at' => 'datetime',
+        'disetujui_at' => 'datetime', 'penandatangan' => 'array'];
 
     const MENUNGGU_ATASAN = 'Menunggu Atasan';
     const MENUNGGU_HRD = 'Menunggu HRD';
@@ -45,6 +46,35 @@ class Pengajuan extends Model
     public function statusSetelahAtasan(): string
     {
         return $this->jenis->alur === 'atasan' ? 'Disetujui' : self::MENUNGGU_HRD;
+    }
+
+    /**
+     * Dipanggil saat pengajuan disetujui di tahap akhir: beri nomor surat urut per tahun,
+     * kode validasi acak untuk QR, dan salinan penandatangan saat itu (dokumen lama tidak ikut berubah
+     * bila penandatangan diganti).
+     */
+    public function sahkan(): void
+    {
+        if ($this->nomor) {
+            return;
+        }
+        $pejabat = Pengaturan::penandatangan();
+        $tahun = now()->year;
+        $urut = static::whereYear('disetujui_at', $tahun)->count() + 1;
+        $romawi = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'][now()->month - 1];
+
+        $this->update([
+            'nomor' => sprintf('%03d/%s/%s/%d', $urut, Pengaturan::nilai('kode_surat', 'HRD'), $romawi, $tahun),
+            'kode_validasi' => \Illuminate\Support\Str::random(32),
+            'disetujui_at' => now(),
+            // Salinan saat disetujui: dokumen lama tetap atas nama pejabat saat itu walau Rektor berganti
+            'penandatangan' => [
+                'staff_id' => $pejabat?->id,
+                'nama' => $pejabat?->nama,
+                'jabatan' => ($pejabat?->level ?? 'Rektor') . ' ITB PalComTech',
+                'nip' => $pejabat?->nip,
+            ],
+        ]);
     }
 
     public function selesai(): bool

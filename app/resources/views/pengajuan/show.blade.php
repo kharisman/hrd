@@ -5,6 +5,8 @@
 @endsection
 
 @section('actions')
+    <a href="{{ route('pengajuan.pdf', $p) }}" target="_blank" class="btn {{ $p->status === 'Disetujui' ? 'btn-success' : 'btn-outline-secondary' }}">
+        <i class="bi bi-file-earmark-pdf me-1"></i>{{ $p->status === 'Disetujui' ? 'Unduh PDF Bertanda Tangan' : 'Pratinjau PDF' }}</a>
     @if ($p->staff_id === $me && !$p->selesai())
         <form method="post" action="{{ route('pengajuan.batal', $p) }}" onsubmit="return confirm('Batalkan pengajuan ini?')">
             @csrf <button class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Batalkan</button>
@@ -21,6 +23,7 @@
                 <span class="badge text-bg-{{ \App\Models\Pengajuan::WARNA[$p->status] }}">{{ $p->status }}</span>
             </div>
             <table class="table mb-0">
+                @if ($p->nomor)<tr><th style="width:35%">Nomor</th><td>{{ $p->nomor }}</td></tr>@endif
                 <tr><th style="width:35%">Pengaju</th><td>{{ $p->namaPengaju($me) }}
                     @unless ($p->anonim && $p->staff_id !== $me)<br><small class="text-muted">{{ $p->staff->level ?? '' }} · {{ $p->staff->divisi ?? '' }}</small>@endunless</td></tr>
                 <tr><th>Diajukan</th><td>{{ $p->created_at->translatedFormat('d F Y H:i') }}</td></tr>
