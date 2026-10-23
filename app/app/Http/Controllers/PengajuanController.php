@@ -140,7 +140,6 @@ class PengajuanController extends Controller
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('pengajuan.pdf', [
             'p' => $pengajuan,
             'qr' => $qr,
-            'logo' => base64_encode(file_get_contents(public_path('logo-pct1.png'))),
             'pengaju' => $pengajuan->namaPengaju($this->myStaffId()),
             'kota' => Pengaturan::nilai('kota', 'Palembang'),
         ])->setPaper('a4')->stream('Pengajuan-' . str_replace('/', '-', $pengajuan->nomor ?? $pengajuan->id) . '.pdf');
