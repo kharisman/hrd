@@ -33,10 +33,14 @@ class AuthController extends Controller
             return back()->withInput()->with('error', 'Username atau password salah');
         }
 
-        $peran = PctApi::peran($profil['roles']);
-        if (!$peran || ($peran !== 'admin' && !$profil['terdaftar'])) {
+        // Username login = Username di master staff/dosen (salinan sinkron)
+        $staff = Staff::where('username', $profil['username'])->first();
+        $dosen = Dosen::where('username', $profil['username'])->first();
+
+        [$peran, $tolak] = $this->tentukanPeran($profil, $staff, $dosen);
+        if ($tolak) {
             $api->logout($profil['token']);
-            return back()->withInput()->with('error', 'Akun Anda tidak memiliki akses ke HRD.');
+            return back()->withInput()->with('error', $tolak);
         }
 
         $akun = Akun::updateOrCreate(['api_id' => $profil['api_id']], [
@@ -46,10 +50,9 @@ class AuthController extends Controller
             'scopes' => $profil['scopes'],
             'peran' => $peran,
             'nip' => $profil['nip'],
-            // Username login = Username di master staff/dosen (salinan sinkron)
-            'staff_id' => Staff::where('username', $profil['username'])->value('id'),
+            'staff_id' => $staff?->id,
             'nidn' => $profil['nidn'],
-            'dosen_id' => Dosen::where('username', $profil['username'])->value('id'),
+            'dosen_id' => $dosen?->id,
             'divisi' => $profil['divisi'],
             'level' => $profil['level'],
             'last_login_at' => now(),
@@ -60,6 +63,38 @@ class AuthController extends Controller
         // Token eUniversity disimpan di session (server), dipakai untuk semua aksi ke API atas nama akun ini
         session(['pct_token' => $profil['token']]);
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * [peran, pesan tolak]. Role-map eUniversity hanya memberi role ke sebagian kecil divisi/level,
+     * jadi kebanyakan staf login tanpa role. Karena itu bila role kosong, peran ditentukan dari
+     * data pegawai/dosen aktif hasil sinkron (username sama).
+     */
+    private function tentukanPeran(array $profil, ?Staff $staff, ?Dosen $dosen): array
+    {
+        $peran = PctApi::peran($profil['roles']);
+        if ($peran === 'admin') {
+            return ['admin', null];
+        }
+
+        $staffAktif = $staff?->aktif;
+        $dosenAktif = $dosen?->aktif;
+        $peran ??= match (true) {
+            (bool) $dosenAktif => 'dosen',
+            (bool) $staffAktif => 'staff',
+            default => null,
+        };
+
+        if (!$peran) {
+            return [null, ($staff || $dosen)
+                ? 'Akun Anda tercatat tidak aktif di eUniversity, sehingga tidak bisa masuk HRD. Hubungi bagian SDM.'
+                : 'Akun Anda tidak terdaftar sebagai pegawai atau dosen, sehingga tidak bisa masuk HRD.'];
+        }
+        // Akun yang sudah dihapus dari master (API & salinan HRD) tidak boleh masuk walau masih punya role
+        if (!$profil['terdaftar'] && !$staffAktif && !$dosenAktif) {
+            return [null, 'Data pegawai/dosen Anda tidak ditemukan di eUniversity. Hubungi bagian SDM.'];
+        }
+        return [$peran, null];
     }
 
     public function logout(Request $request, PctApi $api)
