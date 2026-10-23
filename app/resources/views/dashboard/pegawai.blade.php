@@ -23,6 +23,13 @@
     </div>
 </div>
 
+@if ($staff && !$staff->telegram)
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-telegram me-1"></i> Hubungkan Telegram supaya bisa login dengan NIP/NIDN + kode OTP.</span>
+    <a href="{{ route('telegram-saya') }}" class="btn btn-sm btn-info">Hubungkan</a>
+</div>
+@endif
+
 @if ($pengajuanBawahan)
 <div class="alert alert-warning d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan bawahan (dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>

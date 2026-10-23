@@ -92,6 +92,16 @@ class StaffController extends Controller
         return back()->with('ok', $pesan . ($dilewati ? " — {$dilewati} dilewati karena atasan tidak boleh menjadi bawahan dari bawahannya sendiri." : ''));
     }
 
+    // Chat ID Telegram untuk login OTP (isian HRD, tidak dikirim ke eUniversity)
+    public function telegram(Request $request, Staff $staff)
+    {
+        $chat = $request->validate(['telegram' => 'nullable|regex:/^-?\d{5,20}$/'], ['telegram.regex' => 'Chat ID Telegram berupa angka.'])['telegram'];
+        // Satu orang bisa punya beberapa akun staff (NIP sama): samakan semuanya
+        Staff::where('id', $staff->id)->when($staff->nip, fn ($q) => $q->orWhere('nip', $staff->nip))->update(['telegram' => $chat]);
+        \App\Models\Dosen::where('staff_id', $staff->id)->update(['telegram' => $chat]);
+        return back()->with('ok', $chat ? 'Chat ID Telegram disimpan.' : 'Chat ID Telegram dihapus.');
+    }
+
     public function show(Staff $staff)
     {
         abort_unless($this->isAdmin() || $staff->id == $this->myStaffId(), 403);

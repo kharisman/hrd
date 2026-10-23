@@ -8,9 +8,11 @@ use App\Http\Controllers\JenisCutiController;
 use App\Http\Controllers\JenisPengajuanController;
 use App\Http\Controllers\PengajuanController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\TelegramSayaController;
 use Illuminate\Support\Facades\Route;
 
 // Halaman publik tujuan QR tanda tangan (tanpa login). Dibatasi 30 permintaan/menit supaya kode tidak bisa ditebak beruntun.
@@ -19,14 +21,26 @@ Route::get('validasi/{kode}', [PengajuanController::class, 'validasi'])->middlew
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login']);
+    // Login NIP/NIDN + OTP Telegram
+    Route::post('login/otp', [OtpController::class, 'kirim'])->name('login.otp.kirim');
+    Route::get('login/otp', [OtpController::class, 'formKode'])->name('login.otp');
+    Route::post('login/otp/verifikasi', [OtpController::class, 'verifikasi'])->middleware('throttle:10,1')->name('login.otp.verifikasi');
 });
 
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+    // Hubungkan Telegram mandiri (untuk login NIP/NIDN + OTP)
+    Route::get('telegram', [TelegramSayaController::class, 'index'])->name('telegram-saya');
+    Route::post('telegram/kirim', [TelegramSayaController::class, 'kirim'])->name('telegram-saya.kirim');
+    Route::post('telegram/verifikasi', [TelegramSayaController::class, 'verifikasi'])->middleware('throttle:10,1')->name('telegram-saya.verifikasi');
+    Route::post('telegram/putus', [TelegramSayaController::class, 'putus'])->name('telegram-saya.putus');
+    Route::post('telegram/batal', [TelegramSayaController::class, 'batal'])->name('telegram-saya.batal');
     Route::get('/', DashboardController::class)->name('dashboard');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
     Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
     Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');
+    Route::post('pegawai/{staff}/telegram', [StaffController::class, 'telegram'])->name('staff.telegram');
+    Route::post('dosen/{dosen}/telegram', [DosenController::class, 'telegram'])->name('dosen.telegram');
     Route::resource('pegawai', StaffController::class)->parameters(['pegawai' => 'staff'])->names('staff');
     Route::post('dosen/sinkron', [DosenController::class, 'sinkron'])->name('dosen.sinkron');
     Route::resource('dosen', DosenController::class);
@@ -50,6 +64,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('dokumen', 'dokumen')->name('dokumen');
         Route::post('dokumen', 'simpanDokumen')->name('dokumen.simpan');
+        Route::get('telegram', 'telegram')->name('telegram');
+        Route::post('telegram', 'simpanTelegram')->name('telegram.simpan');
+        Route::post('telegram/uji', 'ujiTelegram')->name('telegram.uji');
         Route::get('sinkron', 'sinkron')->name('sinkron');
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');

@@ -99,6 +99,7 @@
     <div class="p-3 border-top border-secondary small">
         <div class="fw-semibold">{{ auth()->user()->name }}</div>
         <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran] }}</div>
+        <a href="{{ route('telegram-saya') }}" class="btn btn-sm btn-outline-light w-100 mb-2"><i class="bi bi-telegram me-1"></i>Telegram Saya</a>
         <form method="post" action="{{ route('logout') }}" data-no-ajax>@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
     </div>
 </aside>
