@@ -52,6 +52,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('dokumen', 'dokumen')->name('dokumen');
         Route::post('dokumen', 'simpanDokumen')->name('dokumen.simpan');
+        Route::get('pejabat', 'pejabat')->name('pejabat');
+        Route::post('pejabat', 'tambahPejabat')->name('pejabat.tambah');
+        Route::delete('pejabat/{pejabat}', 'hapusPejabat')->name('pejabat.hapus');
         Route::get('sinkron', 'sinkron')->name('sinkron');
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');

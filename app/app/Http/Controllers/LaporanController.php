@@ -34,7 +34,7 @@ class LaporanController extends Controller
         $tahun = $r->integer('tahun') ?: now()->year;
         $jenis = JenisCuti::orderBy('id')->get();
         $status = $r->input('status', 'Disetujui');
-        $hari = Pengajuan::cuti()->whereIn('status', $status === 'Menunggu' ? Pengajuan::MENUNGGU : [$status])->whereYear('tgl_mulai', $tahun)
+        $hari = Pengajuan::cuti()->when($status === 'Menunggu', fn ($q) => $q->menunggu(), fn ($q) => $q->where('status', $status))->whereYear('tgl_mulai', $tahun)
             ->selectRaw('staff_id, jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari, COUNT(*) n')
             ->groupBy('staff_id', 'jenis_cuti_id')->toBase()->get()->groupBy('staff_id');
 
@@ -121,9 +121,10 @@ class LaporanController extends Controller
     {
         $tahun = $r->integer('tahun') ?: now()->year;
         $hitung = \App\Models\Pengajuan::whereYear('created_at', $tahun)
-            ->selectRaw('jenis_pengajuan_id, status, count(*) n')->groupBy('jenis_pengajuan_id', 'status')
+            // Semua "Menunggu <tahap>" digabung jadi satu kolom Menunggu
+            ->selectRaw("jenis_pengajuan_id, if(status like 'Menunggu%', 'Menunggu', status) status, count(*) n")->groupBy('jenis_pengajuan_id', 'status')
             ->toBase()->get()->groupBy('jenis_pengajuan_id');
-        $status = \App\Models\Pengajuan::STATUS;
+        $status = ['Menunggu', ...\App\Models\Pengajuan::SELESAI];
 
         $baris = \App\Models\JenisPengajuan::orderBy('urutan')
             ->when($r->kategori, fn ($q, $v) => $q->where('kategori', $v))->get()

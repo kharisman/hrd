@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Akun;
 use App\Models\Dosen;
+use App\Models\Pejabat;
 use App\Models\Staff;
 use App\Models\Pengaturan;
 use App\Services\PctApi;
@@ -47,6 +48,32 @@ class PengaturanController extends Controller
         ], ['kode_surat.regex' => 'Kode surat hanya boleh huruf, angka, garis miring, titik, dan tanda hubung.']);
         Pengaturan::simpan($d);
         return back()->with('ok', 'Pengaturan dokumen disimpan. Berlaku untuk pengajuan yang disetujui setelah ini.');
+    }
+
+    // ---- Peran pejabat (tahap persetujuan Warek I/II, Keuangan, BAAK) ----
+
+    public function pejabat()
+    {
+        return view('pengaturan.pejabat', [
+            'pemegang' => Pejabat::with('staff')->get()->groupBy('peran'),
+            'pegawai' => Staff::aktif()->orderBy('nama')->get(['id', 'nama', 'nip', 'divisi', 'level']),
+        ]);
+    }
+
+    public function tambahPejabat(\Illuminate\Http\Request $r)
+    {
+        $d = $r->validate([
+            'peran' => ['required', \Illuminate\Validation\Rule::in(array_keys(Pejabat::PERAN))],
+            'staff_id' => ['required', \Illuminate\Validation\Rule::exists('staffs', 'id')->where('aktif', true)],
+        ]);
+        $p = Pejabat::firstOrCreate($d);
+        return back()->with('ok', ($p->staff->nama ?? 'Pegawai') . ' ditetapkan sebagai ' . Pejabat::PERAN[$d['peran']] . '.');
+    }
+
+    public function hapusPejabat(Pejabat $pejabat)
+    {
+        $pejabat->delete();
+        return back()->with('ok', ($pejabat->staff->nama ?? 'Pegawai') . ' dilepas dari ' . Pejabat::PERAN[$pejabat->peran] . '.');
     }
 
     // ---- Sinkron eUniversity ----

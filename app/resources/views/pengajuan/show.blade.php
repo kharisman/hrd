@@ -20,7 +20,7 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 Isi Pengajuan
-                <span class="badge text-bg-{{ \App\Models\Pengajuan::WARNA[$p->status] }}">{{ $p->status }}</span>
+                <span class="badge text-bg-{{ \App\Models\Pengajuan::warna($p->status) }}">{{ $p->status }}</span>
             </div>
             <table class="table mb-0">
                 @if ($p->nomor)<tr><th style="width:35%">Nomor</th><td>{{ $p->nomor }}</td></tr>@endif
@@ -52,36 +52,36 @@
     </div>
 
     <div class="col-lg-5 d-flex flex-column gap-3">
-        {{-- Riwayat persetujuan --}}
+        {{-- Alur: tahap selesai (dengan keputusan), tahap berjalan, tahap berikutnya --}}
         <div class="card">
-            <div class="card-header">Alur Persetujuan <small class="text-muted">({{ \App\Models\JenisPengajuan::ALUR[$p->jenis->alur] }})</small></div>
+            <div class="card-header">Alur Persetujuan <small class="text-muted">({{ \App\Models\JenisPengajuan::teksAlur($p->tahapan ?? []) }})</small></div>
             <ul class="list-group list-group-flush small">
                 <li class="list-group-item"><i class="bi bi-send text-primary me-1"></i> Diajukan · {{ $p->created_at->diffForHumans() }}</li>
-                @if ($p->atasan_at)
-                    <li class="list-group-item"><i class="bi {{ $p->status === 'Ditolak' && !$p->hrd_at ? 'bi-x-circle text-danger' : 'bi-check-circle text-success' }} me-1"></i>
-                        Atasan: {{ $p->atasan_oleh }} · {{ $p->atasan_at->diffForHumans() }}
-                        @if ($p->atasan_catatan)<div class="text-muted ms-3">“{{ $p->atasan_catatan }}”</div>@endif</li>
-                @endif
-                @if ($p->hrd_at)
-                    <li class="list-group-item"><i class="bi {{ $p->status === 'Ditolak' ? 'bi-x-circle text-danger' : 'bi-check-circle text-success' }} me-1"></i>
-                        HRD: {{ $p->hrd_oleh }} · {{ $p->hrd_at->diffForHumans() }}
-                        @if ($p->hrd_catatan)<div class="text-muted ms-3">“{{ $p->hrd_catatan }}”</div>@endif</li>
-                @endif
-                @unless ($p->selesai())
-                    <li class="list-group-item text-muted"><i class="bi bi-hourglass-split me-1"></i>
-                        {{ $p->status === \App\Models\Pengajuan::MENUNGGU_ATASAN ? 'Menunggu atasan: ' . ($p->staff->atasan->nama ?? '-') : 'Menunggu diproses HRD' }}</li>
-                @endunless
+                @foreach ($p->tahapan ?? [] as $i => $t)
+                    @php($k = $p->riwayat[$i] ?? null)
+                    @php($label = \App\Models\JenisPengajuan::TAHAP[$t] ?? $t)
+                    @if ($k)
+                        <li class="list-group-item"><i class="bi {{ $k['setuju'] ? 'bi-check-circle text-success' : 'bi-x-circle text-danger' }} me-1"></i>
+                            {{ $label }}: {{ $k['oleh'] }} · {{ \Illuminate\Support\Carbon::parse($k['at'])->diffForHumans() }}
+                            @if ($k['catatan'])<div class="text-muted ms-3">“{{ $k['catatan'] }}”</div>@endif</li>
+                    @elseif ($i === $p->tahap_ke && !$p->selesai())
+                        <li class="list-group-item fw-semibold"><i class="bi bi-hourglass-split text-warning me-1"></i>
+                            Menunggu {{ $label }}{{ $t === 'atasan' ? ': ' . ($p->staff->atasan->nama ?? '-') : '' }}</li>
+                    @elseif (!$p->selesai())
+                        <li class="list-group-item text-muted"><i class="bi bi-circle me-1"></i> {{ $label }}</li>
+                    @endif
+                @endforeach
                 @if ($p->status === 'Dibatalkan')
                     <li class="list-group-item text-muted"><i class="bi bi-x-circle me-1"></i> Dibatalkan oleh pengaju</li>
                 @endif
             </ul>
         </div>
 
-        {{-- Tombol proses untuk atasan / HRD --}}
+        {{-- Tombol proses untuk pemutus tahap yang sedang berjalan --}}
         @if ($tahap)
             <form method="post" action="{{ route('pengajuan.proses', $p) }}" class="card"><div class="card-body">
                 @csrf
-                <h6>Proses sebagai {{ $tahap === 'atasan' ? 'Atasan' : 'HRD' }}</h6>
+                <h6>Proses sebagai {{ \App\Models\JenisPengajuan::TAHAP[$tahap] }}</h6>
                 <textarea name="catatan" rows="2" class="form-control mb-2" placeholder="Catatan (opsional)"></textarea>
                 <div class="d-flex gap-2">
                     <button name="keputusan" value="setujui" class="btn btn-success flex-fill"><i class="bi bi-check-lg me-1"></i>Setujui</button>

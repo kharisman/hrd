@@ -90,12 +90,10 @@
     <div class="bagian">Persetujuan:</div>
     <table class="data">
         <tr><td class="l">Status</td><td class="t">:</td><td><strong>{{ $p->status }}</strong></td></tr>
-        @if ($p->atasan_at)
-            <tr><td class="l">Atasan Langsung</td><td class="t">:</td><td>{{ $p->atasan_oleh }}, {{ $p->atasan_at->translatedFormat('d F Y') }}{{ $p->atasan_catatan ? ' (' . $p->atasan_catatan . ')' : '' }}</td></tr>
-        @endif
-        @if ($p->hrd_at)
-            <tr><td class="l">Bagian SDM</td><td class="t">:</td><td>{{ $p->hrd_oleh }}, {{ $p->hrd_at->translatedFormat('d F Y') }}{{ $p->hrd_catatan ? ' (' . $p->hrd_catatan . ')' : '' }}</td></tr>
-        @endif
+        @foreach ($p->riwayat ?? [] as $k)
+            <tr><td class="l">{{ ['atasan' => 'Atasan Langsung', 'hrd' => 'Bagian SDM'][$k['tahap']] ?? \App\Models\JenisPengajuan::TAHAP[$k['tahap']] ?? $k['tahap'] }}</td><td class="t">:</td>
+                <td>{{ $k['setuju'] ? 'Disetujui' : 'Ditolak' }} oleh {{ $k['oleh'] }}, {{ \Illuminate\Support\Carbon::parse($k['at'])->translatedFormat('d F Y') }}{{ $k['catatan'] ? ' (' . $k['catatan'] . ')' : '' }}</td></tr>
+        @endforeach
     </table>
 
     {{-- Tanda tangan elektronik pejabat Rektor (QR menuju halaman validasi) --}}

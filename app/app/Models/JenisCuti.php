@@ -27,7 +27,7 @@ class JenisCuti extends Model
     public static function rekap(int|array $staffId, ?int $tahun = null)
     {
         $terpakai = Pengajuan::cuti()->whereIn('staff_id', (array) $staffId)
-            ->whereIn('status', ['Disetujui', ...Pengajuan::MENUNGGU])
+            ->where(fn ($q) => $q->where('status', 'Disetujui')->orWhere(fn ($w) => $w->menunggu()))
             ->whereYear('tgl_mulai', $tahun ?? now()->year)
             ->selectRaw('jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari')
             ->groupBy('jenis_cuti_id')

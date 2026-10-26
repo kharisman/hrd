@@ -22,6 +22,7 @@ class Menu
         return [
             ['jenis-cuti.index', 'sliders', 'Jenis & Jatah Cuti', 'Jenis cuti dan jatah hari per tahun'],
             ['jenis-pengajuan.index', 'ui-checks', 'Jenis Pengajuan', 'Form pengajuan pegawai: isian & alur persetujuan'],
+            ['pengaturan.pejabat', 'person-badge', 'Peran Pejabat', 'Pegawai pemegang Warek I/II, Keuangan, BAAK untuk tahap persetujuan'],
             ['pengaturan.dokumen', 'qr-code', 'Dokumen & Penandatangan', 'Pejabat Rektor penanda tangan QR, kota, kode nomor surat'],
             ['pengaturan.sinkron', 'arrow-repeat', 'Sinkron eUniversity', 'Tarik data pegawai & dosen dari API'],
             ['pengaturan.api', 'plug', 'Integrasi API', 'Alamat API, akun layanan, pemetaan role, cek koneksi'],

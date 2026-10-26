@@ -4,21 +4,53 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-// Alur: [Menunggu Atasan] → [Menunggu HRD] → Disetujui, atau Ditolak di tahap mana pun.
-// Tahap yang tidak ada di alur jenisnya dilewati (mis. alur "HRD saja", atau pegawai belum punya atasan).
+// Alur: urutan tahap dari jenisnya (mis. atasan → keuangan → hrd), disalin ke kolom tahapan saat diajukan.
+// Status "Menunggu <Tahap>" bergeser satu per satu → Disetujui, atau Ditolak di tahap mana pun.
+// Tahap atasan dilewati bila pegawai belum punya atasan atau pengajuan anonim.
 class Pengajuan extends Model
 {
     protected $connection = 'mysql';
     protected $table = 'pengajuan';
     protected $guarded = ['id'];
-    protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'atasan_at' => 'datetime', 'hrd_at' => 'datetime',
+    protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'tahapan' => 'array', 'riwayat' => 'array',
         'disetujui_at' => 'datetime', 'penandatangan' => 'array', 'tgl_mulai' => 'date', 'tgl_selesai' => 'date'];
 
-    const MENUNGGU_ATASAN = 'Menunggu Atasan';
-    const MENUNGGU_HRD = 'Menunggu HRD';
-    const MENUNGGU = [self::MENUNGGU_ATASAN, self::MENUNGGU_HRD];
-    const STATUS = [self::MENUNGGU_ATASAN, self::MENUNGGU_HRD, 'Disetujui', 'Ditolak', 'Dibatalkan'];
-    const WARNA = ['Menunggu Atasan' => 'warning', 'Menunggu HRD' => 'info', 'Disetujui' => 'success', 'Ditolak' => 'danger', 'Dibatalkan' => 'secondary'];
+    const SELESAI = ['Disetujui', 'Ditolak', 'Dibatalkan'];
+
+    public static function menunggu(string $tahap): string
+    {
+        return 'Menunggu ' . (JenisPengajuan::TAHAP[$tahap] ?? $tahap);
+    }
+
+    // Semua status untuk filter: Menunggu <tiap tahap> + status akhir
+    public static function semuaStatus(): array
+    {
+        return [...array_map([self::class, 'menunggu'], array_keys(JenisPengajuan::TAHAP)), ...self::SELESAI];
+    }
+
+    public static function warna(string $status): string
+    {
+        return ['Disetujui' => 'success', 'Ditolak' => 'danger', 'Dibatalkan' => 'secondary'][$status]
+            ?? ($status === self::menunggu('atasan') ? 'warning' : 'info');
+    }
+
+    public function scopeMenunggu($q)
+    {
+        return $q->whereNotIn('status', self::SELESAI);
+    }
+
+    /**
+     * Pengajuan yang sedang menunggu keputusan orang ini: bawahannya di tahap atasan, peran pejabatnya,
+     * atau tahap HRD bila admin. Pengajuan miliknya sendiri tidak termasuk.
+     */
+    public function scopeTugas($q, $staffIds, bool $admin)
+    {
+        $staffIds = collect($staffIds);
+        $bawahan = $staffIds->isEmpty() ? collect() : Staff::whereIn('atasan_id', $staffIds)->pluck('id');
+        $status = Pejabat::peranDari($staffIds)->map([self::class, 'menunggu'])->when($admin, fn ($s) => $s->push(self::menunggu('hrd')));
+        return $q->whereNotIn('staff_id', $staffIds)->where(fn ($w) => $w->whereIn('status', $status)
+            ->orWhere(fn ($x) => $x->where('status', self::menunggu('atasan'))->whereIn('staff_id', $bawahan)->where('anonim', false)));
+    }
 
     public function jenis()
     {
@@ -52,17 +84,33 @@ class Pengajuan extends Model
         return $this->anonim && $viewerStaffId !== $this->staff_id ? 'Anonim' : ($this->staff->nama ?? '#' . $this->staff_id);
     }
 
-    // Status awal saat dikirim. Anonim langsung ke HRD (tidak lewat atasan).
-    public static function statusAwal(JenisPengajuan $jenis, Staff $staff, bool $anonim): string
+    // Kolom alur saat dikirim: salinan tahapan jenis, tanpa tahap atasan bila tak punya atasan / anonim
+    public static function alurAwal(JenisPengajuan $jenis, Staff $staff, bool $anonim): array
     {
-        $lewatAtasan = in_array($jenis->alur, ['atasan_hrd', 'atasan']) && $staff->atasan_id && !$anonim;
-        return $lewatAtasan ? self::MENUNGGU_ATASAN : self::MENUNGGU_HRD;
+        $tahapan = array_values(array_filter($jenis->tahapan ?: ['hrd'], fn ($t) => $t !== 'atasan' || ($staff->atasan_id && !$anonim)));
+        $tahapan = $tahapan ?: ['hrd']; // alur "Atasan saja" tanpa atasan → HRD yang memutus
+        return ['tahapan' => $tahapan, 'tahap_ke' => 0, 'riwayat' => [], 'status' => self::menunggu($tahapan[0])];
     }
 
-    // Status setelah atasan menyetujui
-    public function statusSetelahAtasan(): string
+    public function tahapSekarang(): ?string
     {
-        return $this->jenis->alur === 'atasan' ? 'Disetujui' : self::MENUNGGU_HRD;
+        return $this->selesai() ? null : ($this->tahapan[$this->tahap_ke] ?? null);
+    }
+
+    // Catat keputusan tahap sekarang; setuju di tahap terakhir → Disetujui + nomor surat & QR
+    public function putuskan(bool $setuju, string $oleh, ?string $catatan): void
+    {
+        $tahap = $this->tahapSekarang();
+        $riwayat = [...($this->riwayat ?? []), ['tahap' => $tahap, 'oleh' => $oleh, 'at' => now()->toDateTimeString(), 'catatan' => $catatan, 'setuju' => $setuju]];
+        $berikut = $this->tahap_ke + 1;
+        $this->update(['riwayat' => $riwayat] + match (true) {
+            !$setuju => ['status' => 'Ditolak'],
+            $berikut >= count($this->tahapan) => ['status' => 'Disetujui', 'tahap_ke' => $berikut],
+            default => ['status' => self::menunggu($this->tahapan[$berikut]), 'tahap_ke' => $berikut],
+        });
+        if ($this->status === 'Disetujui') {
+            $this->sahkan();
+        }
     }
 
     /**
@@ -96,6 +144,6 @@ class Pengajuan extends Model
 
     public function selesai(): bool
     {
-        return !in_array($this->status, [self::MENUNGGU_ATASAN, self::MENUNGGU_HRD]);
+        return in_array($this->status, self::SELESAI);
     }
 }

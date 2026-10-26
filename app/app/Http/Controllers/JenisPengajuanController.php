@@ -25,7 +25,7 @@ class JenisPengajuanController extends Controller
 
     public function create()
     {
-        return view('jenis-pengajuan.form', ['j' => new JenisPengajuan(['alur' => 'atasan_hrd', 'aktif' => true, 'isian' => []])]);
+        return view('jenis-pengajuan.form', ['j' => new JenisPengajuan(['tahapan' => ['atasan', 'hrd'], 'aktif' => true, 'isian' => []])]);
     }
 
     public function store(Request $r)
@@ -51,14 +51,18 @@ class JenisPengajuanController extends Controller
             'nama' => ['required', 'string', 'max:150', Rule::unique('jenis_pengajuan')->ignore($j)],
             'kategori' => 'required|string|max:100',
             'keterangan' => 'nullable|string|max:255',
-            'alur' => ['required', Rule::in(array_keys(JenisPengajuan::ALUR))],
+            'tahapan' => 'required|array|min:1',
+            'tahapan.*' => ['required', Rule::in(array_keys(JenisPengajuan::TAHAP))],
             'isian' => 'required|array|min:1',
             'isian.*.key' => 'nullable|string|max:60',
             'isian.*.label' => 'required|string|max:150',
             'isian.*.tipe' => ['required', Rule::in(array_keys(JenisPengajuan::TIPE))],
             'isian.*.opsi' => 'nullable|string|max:1000',
             'isian.*.wajib' => 'nullable',
-        ], ['isian.required' => 'Minimal satu isian.'], ['isian.*.label' => 'label isian']);
+        ], ['isian.required' => 'Minimal satu isian.', 'tahapan.required' => 'Alur butuh minimal satu tahap.'], ['isian.*.label' => 'label isian']);
+        if (count($d['tahapan']) !== count(array_unique($d['tahapan']))) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['tahapan' => 'Satu tahap hanya boleh muncul sekali dalam alur.']);
+        }
 
         // key dipertahankan untuk isian lama (data pengajuan lama tetap terbaca); isian baru dibuat dari label
         $dipakai = [];
@@ -76,7 +80,8 @@ class JenisPengajuanController extends Controller
             $isian[] = ['key' => $key, 'label' => $f['label'], 'tipe' => $f['tipe'], 'wajib' => !empty($f['wajib']), 'opsi' => $opsi];
         }
 
-        return collect($d)->only(['nama', 'kategori', 'keterangan', 'alur'])->all() + [
+        return collect($d)->only(['nama', 'kategori', 'keterangan'])->all() + [
+            'tahapan' => array_values($d['tahapan']),
             'isian' => $isian,
             'boleh_anonim' => $r->boolean('boleh_anonim'),
             'aktif' => $r->boolean('aktif'),

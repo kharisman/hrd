@@ -19,7 +19,7 @@ class DashboardController extends Controller
     private function admin()
     {
         $hariIni = now()->toDateString();
-        $cutiMenunggu = Pengajuan::cuti()->whereIn('status', Pengajuan::MENUNGGU);
+        $cutiMenunggu = Pengajuan::cuti()->menunggu();
         $daftarCuti = fn ($status = null) => route('pengajuan.index', ['tab' => 'semua', 'jenis' => JenisPengajuan::where('kode', 'cuti')->value('id'), 'status' => $status]);
         $dosenAktif = Dosen::where('aktif', true);
         $terakhirSinkron = max(Staff::max('disinkron_at'), Dosen::max('disinkron_at'));
@@ -37,7 +37,7 @@ class DashboardController extends Controller
                 ['Studi lanjut', RiwayatPendidikan::where('status', 'Sedang Studi Lanjut')->count(), 'journal-bookmark', route('riwayat.index'), 'sedang berjalan'],
             ],
             'tindakan' => [
-                ['Pengajuan (termasuk cuti) menunggu HRD', Pengajuan::where('status', Pengajuan::MENUNGGU_HRD)->count(), route('pengajuan.index', ['tab' => 'semua', 'status' => Pengajuan::MENUNGGU_HRD])],
+                ['Pengajuan (termasuk cuti) menunggu HRD', Pengajuan::tugas($this->myStaffIds(), true)->count(), route('pengajuan.index', ['tab' => 'tugas'])],
                 ['Pegawai aktif belum punya atasan', Staff::aktif()->whereNull('atasan_id')->count(), route('staff.atasan')],
                 ['Dosen aktif tanpa jabatan fungsional', (clone $dosenAktif)->whereNull('jabatan_fungsional')->count(), route('dosen.index')],
                 ['Studi lanjut lewat target lulus', RiwayatPendidikan::where('status', 'Sedang Studi Lanjut')->where('tahun_lulus', '<', now()->year)->count(), route('riwayat.index')],
@@ -66,7 +66,7 @@ class DashboardController extends Controller
             'staff' => $staff,
             'jatah' => $me ? JenisCuti::rekap($this->myStaffIds()->all()) : collect(),
             'cutiSaya' => Pengajuan::cuti()->with('jenisCuti')->whereIn('staff_id', $this->myStaffIds())->latest()->limit(5)->get(),
-            'pengajuanBawahan' => Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', Pengajuan::MENUNGGU_ATASAN)->count(),
+            'pengajuanBawahan' => Pengajuan::tugas($this->myStaffIds(), false)->count(),
             'jenisCuti' => JenisPengajuan::where('kode', 'cuti')->value('id'),
             'jumlahBawahan' => $bawahan->count(),
         ]);

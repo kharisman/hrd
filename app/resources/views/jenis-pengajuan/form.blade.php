@@ -6,6 +6,7 @@
 @endsection
 
 @php($isian = old('isian', $j->isian))
+@php($tahapan = old('tahapan', $j->tahapan ?? ['atasan', 'hrd']))
 
 @section('content')
 <form method="post" action="{{ $j->exists ? route('jenis-pengajuan.update', $j) : route('jenis-pengajuan.store') }}" class="card"><div class="card-body">
@@ -13,18 +14,36 @@
     @if ($j->exists) @method('put') @endif
 
     <div class="row g-3">
-        <div class="col-md-5"><label class="form-label">Nama Form *</label><input name="nama" value="{{ old('nama', $j->nama) }}" class="form-control" required></div>
+        <div class="col-md-8"><label class="form-label">Nama Form *</label><input name="nama" value="{{ old('nama', $j->nama) }}" class="form-control" required></div>
         <div class="col-md-4"><label class="form-label">Kategori *</label>
             <input name="kategori" value="{{ old('kategori', $j->kategori) }}" list="kategoriList" class="form-control" required>
             <datalist id="kategoriList">@foreach (\App\Models\JenisPengajuan::KATEGORI as $k)<option>{{ $k }}</option>@endforeach</datalist></div>
-        <div class="col-md-3"><label class="form-label">Alur Persetujuan *</label>
-            <select name="alur" class="form-select">@foreach (\App\Models\JenisPengajuan::ALUR as $v => $t)<option value="{{ $v }}" @selected(old('alur', $j->alur) === $v)>{{ $t }}</option>@endforeach</select></div>
         <div class="col-md-9"><label class="form-label">Keterangan</label><input name="keterangan" value="{{ old('keterangan', $j->keterangan) }}" class="form-control" placeholder="Tampil di bawah judul form"></div>
         <div class="col-md-3 d-flex align-items-end gap-3">
             <div class="form-check"><input type="checkbox" name="aktif" value="1" id="aktif" class="form-check-input" @checked(old('aktif', $j->aktif))><label for="aktif" class="form-check-label">Aktif</label></div>
             <div class="form-check"><input type="checkbox" name="boleh_anonim" value="1" id="anonim" class="form-check-input" @checked(old('boleh_anonim', $j->boleh_anonim))><label for="anonim" class="form-check-label">Boleh anonim</label></div>
         </div>
     </div>
+
+    <h6 class="mt-4 mb-1">Alur Persetujuan *</h6>
+    <div class="form-text mt-0 mb-2">Urutan tahap dari kiri ke kanan. Setelah tahap terakhir menyetujui, pengajuan sah (nomor surat + QR Rektor).
+        Tahap <strong>Atasan</strong> dilewati bila pegawai belum punya atasan atau mengirim anonim.
+        Pemegang Warek / Keuangan / BAAK diatur di <a href="{{ route('pengaturan.pejabat') }}">Pengaturan → Peran Pejabat</a>.</div>
+    <div id="alur" class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        @foreach ($tahapan as $t)
+            <div class="tahap input-group input-group-sm" style="width:auto">
+                <span class="input-group-text nomor"></span>
+                <select name="tahapan[]" class="form-select form-select-sm" style="width:auto">@foreach (\App\Models\JenisPengajuan::TAHAP as $v => $l)<option value="{{ $v }}" @selected($t === $v)>{{ $l }}</option>@endforeach</select>
+                <button type="button" class="btn btn-outline-secondary" onclick="geserTahap(this)" title="Pindah ke kiri"><i class="bi bi-arrow-left"></i></button>
+                <button type="button" class="btn btn-outline-danger" onclick="hapusTahap(this)" title="Hapus tahap"><i class="bi bi-x"></i></button>
+            </div>
+        @endforeach
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="tambahTahap()"><i class="bi bi-plus-lg me-1"></i>Tahap</button>
+    </div>
+    @error('tahapan')<div class="text-danger small">{{ $message }}</div>@enderror
+    @if ($j->exists && $j->pengajuan()->exists())
+        <div class="form-text"><i class="bi bi-info-circle me-1"></i>Mengubah alur hanya berlaku untuk pengajuan baru; yang sedang berjalan tetap memakai alur saat diajukan.</div>
+    @endif
 
     <h6 class="mt-4 mb-2">Isian Form</h6>
     <div class="table-responsive">
@@ -65,7 +84,26 @@
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()" title="Hapus"><i class="bi bi-x"></i></button></td>
     </tr>
 </template>
+<template id="barisTahap">
+    <div class="tahap input-group input-group-sm" style="width:auto">
+        <span class="input-group-text nomor"></span>
+        <select name="tahapan[]" class="form-select form-select-sm" style="width:auto">@foreach (\App\Models\JenisPengajuan::TAHAP as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select>
+        <button type="button" class="btn btn-outline-secondary" onclick="geserTahap(this)" title="Pindah ke kiri"><i class="bi bi-arrow-left"></i></button>
+        <button type="button" class="btn btn-outline-danger" onclick="hapusTahap(this)" title="Hapus tahap"><i class="bi bi-x"></i></button>
+    </div>
+</template>
 <script>
+    // Editor alur: nomor tahap dihitung ulang setiap ada perubahan
+    function nomoriTahap() { document.querySelectorAll('#alur .tahap .nomor').forEach((n, i) => n.textContent = i + 1); }
+    function tambahTahap() {
+        const tombol = document.querySelector('#alur > button');
+        tombol.insertAdjacentHTML('beforebegin', document.getElementById('barisTahap').innerHTML);
+        nomoriTahap();
+    }
+    function geserTahap(b) { const t = b.closest('.tahap'), kiri = t.previousElementSibling; if (kiri) { t.after(kiri); nomoriTahap(); } }
+    function hapusTahap(b) { if (document.querySelectorAll('#alur .tahap').length > 1) { b.closest('.tahap').remove(); nomoriTahap(); } }
+    nomoriTahap();
+
     let urut = {{ count($isian) + 100 }};
     function tambahIsian() {
         const html = document.getElementById('barisIsian').innerHTML.replaceAll('__i__', urut++);

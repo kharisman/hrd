@@ -19,7 +19,7 @@
             @foreach ($items as $j)
                 <tr class="{{ $j->aktif ? '' : 'text-muted' }}">
                     <td>{{ $j->nama }}@if ($j->boleh_anonim) <span class="badge text-bg-light">anonim</span>@endif<br><small class="text-muted">{{ $j->keterangan }}</small></td>
-                    <td class="small">{{ \App\Models\JenisPengajuan::ALUR[$j->alur] }}</td>
+                    <td class="small">{{ \App\Models\JenisPengajuan::teksAlur($j->tahapan ?? []) }}</td>
                     <td class="text-center">{{ count($j->isian) }}</td>
                     <td class="text-center">{{ $j->pengajuan_count }}</td>
                     <td class="text-center">{!! $j->aktif ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-dash-circle"></i>' !!}</td>

@@ -25,8 +25,8 @@
 
 @if ($pengajuanBawahan)
 <div class="alert alert-warning d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan bawahan (cuti, dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>
-    <a href="{{ route('pengajuan.index', ['tab' => 'atasan']) }}" class="btn btn-sm btn-warning">Proses</a>
+    <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan (cuti, dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>
+    <a href="{{ route('pengajuan.index', ['tab' => 'tugas']) }}" class="btn btn-sm btn-warning">Proses</a>
 </div>
 @endif
 
@@ -63,7 +63,7 @@
                             <div>{{ $c->jenisCuti->nama }} <small class="text-muted">· {{ $c->hari }} hari</small></div>
                             <small class="text-muted">{{ $c->tgl_mulai->translatedFormat('d M') }} – {{ $c->tgl_selesai->translatedFormat('d M Y') }}</small>
                         </div>
-                        <span class="badge text-bg-{{ \App\Models\Pengajuan::WARNA[$c->status] }}">{{ $c->status }}</span>
+                        <span class="badge text-bg-{{ \App\Models\Pengajuan::warna($c->status) }}">{{ $c->status }}</span>
                     </a>
                 @empty
                     <div class="list-group-item text-muted small">Belum ada pengajuan cuti.</div>

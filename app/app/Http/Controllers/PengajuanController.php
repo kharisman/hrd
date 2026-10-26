@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JenisCuti;
 use App\Models\JenisPengajuan;
+use App\Models\Pejabat;
 use App\Models\Pengajuan;
 use App\Models\Pengaturan;
 use App\Models\Staff;
@@ -20,13 +21,16 @@ class PengajuanController extends Controller
     {
         $me = $this->myStaffId();
         $bawahan = $this->bawahan();
-        $tab = $r->input('tab', $this->isAdmin() ? 'semua' : 'saya');
+        $jumlahTugas = Pengajuan::tugas($this->myStaffIds(), $this->isAdmin())->count();
+        $tab = $r->input('tab', $jumlahTugas ? 'tugas' : ($this->isAdmin() ? 'semua' : 'saya'));
 
         $q = Pengajuan::with('jenis', 'staff')->latest();
-        if ($tab === 'atasan') {
-            // Semua pengajuan bawahan (riwayat juga); yang menunggu persetujuan di atas
+        if ($tab === 'tugas') {
+            // Menunggu keputusan saya: sebagai atasan, pejabat (Warek/Keuangan/BAAK), atau HRD
+            $q->tugas($this->myStaffIds(), $this->isAdmin());
+        } elseif ($tab === 'atasan') {
+            // Semua pengajuan bawahan (riwayat juga)
             $q->whereIn('staff_id', $bawahan)->where('anonim', false)
-                ->orderByRaw('status = ? desc', [Pengajuan::MENUNGGU_ATASAN])
                 ->when($r->status, fn ($w, $v) => $w->where('status', $v));
         } elseif ($tab === 'semua') {
             abort_unless($this->isAdmin(), 403);
@@ -41,8 +45,9 @@ class PengajuanController extends Controller
             'tab' => $tab,
             'me' => $me,
             'punyaBawahan' => $bawahan->isNotEmpty(),
-            'jumlahAtasan' => $bawahan->isEmpty() ? 0 : Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', Pengajuan::MENUNGGU_ATASAN)->count(),
-            'jumlahHrd' => $this->isAdmin() ? Pengajuan::where('status', Pengajuan::MENUNGGU_HRD)->count() : 0,
+            'jumlahTugas' => $jumlahTugas,
+            // Tab "Perlu Persetujuan" tampil untuk siapa pun yang bisa memutus (atasan, pejabat, HRD)
+            'bisaMenyetujui' => $jumlahTugas || $bawahan->isNotEmpty() || $this->isAdmin() || Pejabat::peranDari($this->myStaffIds())->isNotEmpty(),
             'jenisList' => JenisPengajuan::orderBy('urutan')->pluck('nama', 'id'),
         ]);
     }
@@ -95,8 +100,8 @@ class PengajuanController extends Controller
         $anonim = $jenis->boleh_anonim && $r->boolean('anonim');
         $p = Pengajuan::create($cuti + [
             'jenis_pengajuan_id' => $jenis->id, 'staff_id' => $staff->id, 'anonim' => $anonim,
-            'data' => $data, 'status' => Pengajuan::statusAwal($jenis, $staff, $anonim),
-        ]);
+            'data' => $data,
+        ] + Pengajuan::alurAwal($jenis, $staff, $anonim));
         return redirect()->route('pengajuan.show', $p)->with('ok', "Pengajuan {$jenis->nama} dikirim ({$p->status}).");
     }
 
@@ -132,17 +137,7 @@ class PengajuanController extends Controller
         abort_unless($tahap, 403, 'Anda tidak berwenang memproses pengajuan ini, atau pengajuan sudah diproses.');
         $d = $r->validate(['keputusan' => 'required|in:setujui,tolak', 'catatan' => 'nullable|string|max:2000']);
 
-        $setuju = $d['keputusan'] === 'setujui';
-        $pengajuan->load('jenis');
-        $pengajuan->update([
-            "{$tahap}_oleh" => auth()->user()->name,
-            "{$tahap}_at" => now(),
-            "{$tahap}_catatan" => $d['catatan'] ?? null,
-            'status' => !$setuju ? 'Ditolak' : ($tahap === 'atasan' ? $pengajuan->statusSetelahAtasan() : 'Disetujui'),
-        ]);
-        if ($pengajuan->status === 'Disetujui') {
-            $pengajuan->sahkan(); // nomor surat + QR tanda tangan
-        }
+        $pengajuan->putuskan($d['keputusan'] === 'setujui', auth()->user()->name, $d['catatan'] ?? null);
         return back()->with('ok', "Pengajuan {$pengajuan->status}." . ($pengajuan->nomor ? " Nomor: {$pengajuan->nomor}" : ''));
     }
 
@@ -200,22 +195,26 @@ class PengajuanController extends Controller
         return $this->myStaffIds()->contains(Staff::whereKey($p->staff_id)->value('atasan_id'));
     }
 
+    // Pengaju, admin, atasannya (bukan anonim), atau pejabat yang ada di alur pengajuan ini
     private function bolehLihat(Pengajuan $p): bool
     {
-        return $this->isAdmin() || $this->myStaffIds()->contains($p->staff_id) || (!$p->anonim && $this->atasannya($p));
+        return $this->isAdmin() || $this->myStaffIds()->contains($p->staff_id) || (!$p->anonim && $this->atasannya($p))
+            || Pejabat::peranDari($this->myStaffIds())->intersect($p->tahapan ?? [])->isNotEmpty();
     }
 
-    // 'atasan' / 'hrd' / null: tahap yang boleh diproses user ini sekarang
+    // Tahap yang boleh diputus user ini sekarang, atau null. Alur wajib urut (hanya tahap yang sedang berjalan),
+    // dan tidak ada yang memutus pengajuannya sendiri. Atasan tidak aktif → HRD mengganti atasan di Atasan & Bawahan.
     private function tahapProses(Pengajuan $p): ?string
     {
-        if ($p->status === Pengajuan::MENUNGGU_ATASAN && $this->atasannya($p)) {
-            return 'atasan';
+        $tahap = $p->tahapSekarang();
+        if (!$tahap || $this->myStaffIds()->contains($p->staff_id)) {
+            return null;
         }
-        // Alur wajib urut: HRD baru memproses setelah atasan. Atasan tidak aktif → HRD ganti atasan di Atasan & Bawahan.
-        // Pengajuan sendiri tidak boleh diproses sendiri (admin juga pegawai).
-        if ($this->isAdmin() && $p->status === Pengajuan::MENUNGGU_HRD && !$this->myStaffIds()->contains($p->staff_id)) {
-            return 'hrd';
-        }
-        return null;
+        $boleh = match ($tahap) {
+            'atasan' => $this->atasannya($p),
+            'hrd' => $this->isAdmin(),
+            default => Pejabat::peranDari($this->myStaffIds())->contains($tahap),
+        };
+        return $boleh ? $tahap : null;
     }
 }

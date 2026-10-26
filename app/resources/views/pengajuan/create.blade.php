@@ -17,7 +17,7 @@
                         <div class="card-body">
                             <div class="fw-semibold">{{ $j->nama }}</div>
                             <div class="text-muted small mb-2">{{ $j->keterangan }}</div>
-                            <span class="badge text-bg-light">{{ \App\Models\JenisPengajuan::ALUR[$j->alur] }}</span>
+                            <span class="badge text-bg-light">{{ \App\Models\JenisPengajuan::teksAlur($j->tahapan ?? []) }}</span>
                             @if ($j->boleh_anonim)<span class="badge text-bg-light">Bisa anonim</span>@endif
                         </div>
                     </a>
@@ -90,9 +90,9 @@
         @endif
 
         <div class="alert alert-light border small mt-3 mb-0">
-            <i class="bi bi-diagram-3 me-1"></i> Alur: <strong>{{ \App\Models\JenisPengajuan::ALUR[$jenis->alur] }}</strong>.
-            @if ($jenis->alur !== 'hrd')
-                Atasan Anda: <strong>{{ $staff->atasan->nama ?? 'belum diatur' }}</strong>{{ $staff->atasan ? '' : ' (pengajuan langsung ke HRD)' }}.
+            <i class="bi bi-diagram-3 me-1"></i> Alur: <strong>{{ \App\Models\JenisPengajuan::teksAlur($jenis->tahapan ?? []) }}</strong>.
+            @if (in_array('atasan', $jenis->tahapan ?? []))
+                Atasan Anda: <strong>{{ $staff->atasan->nama ?? 'belum diatur' }}</strong>{{ $staff->atasan ? '' : ' (tahap atasan dilewati)' }}.
             @endif
         </div>
 
