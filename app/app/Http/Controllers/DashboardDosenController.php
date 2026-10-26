@@ -31,7 +31,7 @@ class DashboardDosenController extends Controller
     public function __invoke(Request $r)
     {
         $prodi = in_array($r->prodi, Dosen::PRODI) ? $r->prodi : null;
-        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Dosen::PRODI)->orderBy('nama')->get()->map(fn ($d) => $this->nilai($d));
+        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Dosen::PRODI)->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
         $dosen = $prodi ? $semua->where('prodi', $prodi)->values() : $semua;
 
         return view('dashboard.dosen', [
@@ -197,7 +197,7 @@ class DashboardDosenController extends Controller
     }
 
     // Status jafung & serdos satu dosen
-    private function nilai(Dosen $d): object
+    public function nilaiDosen(Dosen $d): object
     {
         $jenjang = max(0, (int) array_search($d->jabatan_fungsional, self::JAFUNG));
         $mulai = $d->tmt_dosen ?? $d->mulai_kerja;

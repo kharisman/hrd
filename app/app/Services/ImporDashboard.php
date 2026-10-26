@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CapaianDosen;
+use App\Models\Disc;
 use App\Models\Dosen;
 use App\Models\Kehadiran;
 use App\Models\Kompetensi;
@@ -242,6 +244,199 @@ class ImporDashboard
         $sama = $prodi ? $semua->where('program_studi', $prodi) : collect();
         $pilih = $sama->count() === 1 ? $sama : $semua->where('aktif', true);
         return $pilih->count() === 1 ? $pilih->first() : ($semua->count() === 1 ? $semua->first() : null);
+    }
+
+    // Tab "DISC ..." (Dashboard HRD): peta karakter per orang; baris judul "Inisiatif ... Project"
+    public function disc(string $file): array
+    {
+        $tabs = ['DISC Prodi SI' => 'Prodi SI', 'DISC Prodi IF' => 'Prodi IF', 'DISC Prodi BD' => 'Prodi BD', 'DISC Tim warek2' => 'Tim Warek II',
+            'DISC SarPras' => 'SarPras', 'DISC Perpustakaan' => 'Perpustakaan', 'DISC Sales & Marketing' => 'Sales & Marketing'];
+        $buku = $this->tab($file, $tabs);
+        $hasil = ['orang' => 0, 'tak_cocok' => []];
+        foreach ($tabs as $tab => $tim) {
+            $rows = $this->baris($buku->getSheetByName($tab));
+            $j = collect($rows)->search(fn ($r) => in_array('Inisiatif', array_map(fn ($v) => trim((string) $v), $r), true));
+            if ($j === false) {
+                continue;
+            }
+            $awal = array_search('Inisiatif', array_map(fn ($v) => trim((string) $v), $rows[$j]));
+            // Kolom nama, profil & tanggal dari baris judul di atasnya
+            $atas = array_map(fn ($v) => strtolower(preg_replace('/\s+/', ' ', (string) $v)), $rows[$j - 1]);
+            $kol = fn ($kata) => collect($atas)->search(fn ($v) => str_contains($v, $kata));
+            [$kNama, $kProfil, $kTgl] = [$kol('nama karyawan'), $kol('profil'), $kol('last')];
+            foreach (array_slice($rows, $j + 1) as $r) {
+                $nama = trim((string) ($r[$kNama] ?? ''));
+                if (!$nama || !is_numeric($r[$awal] ?? null) || str_starts_with($nama, '#')) {
+                    continue;
+                }
+                $staff = $this->staffBernama($nama);
+                if (!$staff?->nip) {
+                    $hasil['tak_cocok'][] = "$nama ($tab)";
+                    continue;
+                }
+                $skor = array_combine([...array_keys(Disc::KOMITMEN), ...array_keys(Disc::KOMPETENSI)],
+                    array_map(fn ($i) => is_numeric($r[$awal + $i] ?? null) ? (int) $r[$awal + $i] : null, range(0, 7)));
+                Disc::updateOrCreate(['nip' => $staff->nip], $skor + [
+                    'tim' => $tim, 'profil' => trim((string) ($r[$kProfil] ?? '')) ?: null, 'dinilai_at' => $kTgl !== false ? $this->tgl($r[$kTgl] ?? null) : null,
+                ]);
+                $hasil['orang']++;
+            }
+        }
+        return $hasil;
+    }
+
+    /**
+     * Tab per dosen (Eka P, Jaka, ...) di Dashboard Dosen + tab "Rencana Sertifikasi Dosen".
+     * Tata letak tiap tab berbeda, jadi bagian dicari lewat judul kolomnya.
+     */
+    public function rapor(string $file): array
+    {
+        $semua = IOFactory::createReaderForFile($file)->listWorksheetNames($file);
+        $tabs = array_slice($semua, array_search('KPI', $semua) + 1, array_search('Resume BD', $semua) - array_search('KPI', $semua) - 1);
+        $buku = $this->tab($file, [...$tabs, 'Rencana Sertifikasi Dosen']);
+        $hasil = ['dosen' => 0, 'capaian' => 0, 'tak_cocok' => []];
+
+        foreach ($tabs as $tab) {
+            $sheet = $buku->getSheetByName($tab);
+            $rows = $this->baris($sheet);
+            $nama = collect($rows)->first(fn ($r) => trim((string) ($r[0] ?? '')) === 'Nama Lengkap')[1] ?? $tab;
+            if (!$dosen = $this->dosenBernama($nama) ?? $this->dosenSingkat($tab, null)) {
+                $hasil['tak_cocok'][] = "$nama (tab $tab)";
+                continue;
+            }
+            $hasil['dosen']++;
+            $tautan = fn ($r, $c) => $sheet->getCell([$c + 1, $r + 1])->getHyperlink()->getUrl() ?: null;
+            $bagian = [
+                'roadmap' => ['Rencana Kegiatan', ['tahun' => ['Tahun'], 'bulan' => ['Bulan'], 'status' => ['Capaian'], 'keterangan' => ['Keterangan']]],
+                'sertifikat' => ['Nama Sertifikasi', ['sumber' => ['Penyelenggara'], 'tahun' => ['Tahun', 'Tanggal Sertifikat'], 'link' => ['Link Sertifikat']]],
+                'prestasi' => ['Capaian Prestasi', ['judul' => ['Judul'], 'tahun' => ['Tahun'], 'sumber' => ['Penyelenggara'], 'link' => ['Link Sertifikat']]],
+                'publikasi' => ['Judul Publikasi', ['tahun' => ['Tahun'], 'status' => ['Peringkat Sinta'], 'link' => ['Link Publikasi']]],
+            ];
+            foreach ($bagian as $jenis => [$jangkar, $kolom]) {
+                foreach ($this->bacaBagian($rows, $jangkar, $kolom) as [$baris, $isi, $kolLink]) {
+                    if ($jenis === 'prestasi') {
+                        $isi['status'] = $isi['judul_jangkar']; // jenis prestasi: Buku, HKI, Hibah, ...
+                        $isi['judul'] = $isi['judul'] ?: $isi['judul_jangkar'];
+                    } else {
+                        $isi['judul'] = $isi['judul_jangkar'];
+                    }
+                    $isi['link'] = $kolLink !== null ? ($tautan($baris, $kolLink) ?? (str_starts_with((string) $isi['link'], 'http') ? $isi['link'] : null)) : null;
+                    $hasil['capaian'] += $this->simpanCapaian($dosen, $jenis, $isi);
+                }
+            }
+            // Rekognisi: kolom tanggal + uraian di bawah judul "Rekognisi Dosen"
+            foreach ($rows as $i => $r) {
+                if (($c = array_search('Rekognisi Dosen', array_map(fn ($v) => trim((string) $v), $r))) === false) {
+                    continue;
+                }
+                foreach (array_slice($rows, $i + 1, 12) as $x) {
+                    $uraian = trim((string) ($x[$c + 1] ?? ''));
+                    if (preg_match('/^(Matakuliah|Publikasi|Skor|Prestasi)/i', trim((string) ($x[$c] ?? '')))) {
+                        break;
+                    }
+                    if ($uraian) {
+                        $hasil['capaian'] += $this->simpanCapaian($dosen, 'rekognisi', ['judul' => $uraian, 'tahun' => $this->teksTanggal($x[$c] ?? null)]);
+                    }
+                }
+            }
+            // DISC di profil dosen: dipakai bila pegawainya belum dipetakan di file HRD
+            $disc = collect($rows)->first(fn ($r) => trim((string) ($r[0] ?? '')) === 'DISC')[1] ?? null;
+            if ($disc && ($nip = $dosen->staff?->nip)) {
+                Disc::firstOrCreate(['nip' => $nip], ['profil' => trim($disc), 'tim' => 'Prodi ' . $dosen->program_studi]);
+            }
+        }
+
+        // Rencana sertifikasi → roadmap ("Mei 2026")
+        foreach (array_slice($this->baris($buku->getSheetByName('Rencana Sertifikasi Dosen')), 1) as $r) {
+            if (!($r[1] ?? null) || !$dosen = $this->dosenBernama($r[0])) {
+                continue;
+            }
+            preg_match('/(\p{L}+)\s+(\d{4})/u', (string) ($r[4] ?? ''), $w);
+            $hasil['capaian'] += $this->simpanCapaian($dosen, 'roadmap', [
+                'tahun' => $w[2] ?? null, 'bulan' => $w[1] ?? null, 'judul' => 'Sertifikasi kompetensi: ' . trim($r[1]), 'sumber' => $r[2] ?? null,
+                'keterangan' => is_numeric($r[3] ?? null) ? 'Biaya Rp ' . number_format($r[3], 0, ',', '.') : null,
+            ]);
+        }
+        return $hasil;
+    }
+
+    /**
+     * Baris-baris satu bagian tabel: cari sel judul $jangkar, kolom lain = judul terdekat di baris yang sama
+     * (bagian lain bisa sebaris, mis. "Tahun" muncul dua kali). Berhenti di judul bagian berikutnya / 4 baris kosong.
+     * @return array<int, array{0:int, 1:array, 2:?int}> [nomor baris, isi, kolom link]
+     */
+    private function bacaBagian(array $rows, string $jangkar, array $kolom): array
+    {
+        $hasil = [];
+        foreach ($rows as $i => $r) {
+            $judul = array_map(fn ($v) => trim(preg_replace('/\s+/', ' ', (string) $v)), $r);
+            if (($cj = array_search($jangkar, $judul, true)) === false) {
+                continue;
+            }
+            $peta = ['judul_jangkar' => $cj];
+            foreach ($kolom as $f => $label) {
+                $calon = array_keys(array_filter($judul, fn ($v) => in_array($v, $label, true)));
+                usort($calon, fn ($a, $b) => abs($a - $cj) <=> abs($b - $cj));
+                $peta[$f] = $calon[0] ?? null;
+            }
+            $kosong = 0;
+            foreach (array_slice($rows, $i + 1, null, true) as $n => $x) {
+                $nilai = array_map(fn ($c) => $c === null ? null : (is_string($x[$c] ?? null) ? trim($x[$c]) : ($x[$c] ?? null)), $peta);
+                // Judul bagian berikutnya. Di kolom isi (judul_jangkar) harus persis label judul, karena isinya sendiri
+                // bisa diawali kata yang sama ("Publikasi Jurnal Sinta 2")
+                $lain = collect($nilai)->except('judul_jangkar')->filter(fn ($v) => is_string($v));
+                if (in_array($nilai['judul_jangkar'], ['Rencana Kegiatan', 'Nama Sertifikasi', 'Capaian Prestasi', 'Judul Publikasi', 'Judul', 'Tahun', 'No'], true)
+                    || $lain->contains(fn ($v) => preg_match('/^(Tahun|No|Judul|Prestasi Dosen|Publikasi (Dosen|Penelitan)|Sertifikasi dan Training|Matakuliah|Skor Capaian|Rekognisi Dosen|Capaian Prestasi)\b/i', $v))) {
+                    break;
+                }
+                if ($nilai['judul_jangkar'] === null || $nilai['judul_jangkar'] === '') {
+                    if (++$kosong >= 4) {
+                        break;
+                    }
+                    continue;
+                }
+                $kosong = 0;
+                $nilai['tahun'] = $this->teksTanggal($nilai['tahun'] ?? null);
+                $hasil[] = [$n, $nilai, $peta['link'] ?? null];
+            }
+        }
+        return $hasil;
+    }
+
+    private function simpanCapaian(Dosen $dosen, string $jenis, array $isi): int
+    {
+        $bulan = $isi['bulan'] ?? null;
+        $bulan = is_numeric($bulan) ? (int) $bulan : (array_search(ucfirst(strtolower(trim((string) $bulan))), CapaianDosen::BULAN) ?: null);
+        $judul = mb_substr(trim((string) ($isi['judul'] ?? '')), 0, 500);
+        if (!$judul || $judul === '-') {
+            return 0;
+        }
+        $teks = fn ($k, $n = 255) => ($v = trim((string) ($isi[$k] ?? ''))) !== '' && $v !== '-' ? mb_substr($v, 0, $n) : null;
+        CapaianDosen::updateOrCreate(['dosen_id' => $dosen->id, 'jenis' => $jenis, 'judul' => $judul, 'tahun' => $teks('tahun', 40)], [
+            'bulan' => $bulan, 'sumber' => $teks('sumber'), 'status' => $teks('status'), 'keterangan' => $teks('keterangan', 500), 'link' => $teks('link', 500),
+        ]);
+        return 1;
+    }
+
+    // Tahun/tanggal apa adanya: serial Excel → "2024-02-29", 2024.0 → "2024"
+    private function teksTanggal($v): ?string
+    {
+        return match (true) {
+            $v === null || $v === '' => null,
+            is_numeric($v) && $v > 1900 && $v < 2100 => (string) (int) $v,
+            is_numeric($v) => $this->tgl($v),
+            default => trim((string) $v),
+        };
+    }
+
+    // Pegawai dari nama (tanpa gelar): sama persis, atau beda ketik kecil bila hanya satu kandidat; utamakan aktif
+    private function staffBernama(string $nama): ?Staff
+    {
+        $inti = Sinkron::namaInti($nama);
+        $semua = Staff::whereNotNull('nip')->orderByDesc('aktif')->get();
+        $mirip = $semua->filter(fn ($s) => levenshtein(Sinkron::namaInti($s->nama), $inti) <= 2)->unique('nip');
+        return $semua->first(fn ($s) => Sinkron::namaInti($s->nama) === $inti) ?? ($mirip->count() === 1 ? $mirip->first() : null)
+            ?? ($this->dosenBernama($nama)?->staff);
     }
 
     // Tab Rasio: blok "Rasio Dosen TA xxxx/yyyy" berisi prodi, jumlah dosen, jumlah mahasiswa, rasio, target

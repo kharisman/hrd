@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Disc;
 use App\Models\Dosen;
 use App\Models\Kehadiran;
 use App\Models\Pejabat;
@@ -25,7 +26,7 @@ class DashboardPegawaiController extends Controller
 
     public function __invoke(Request $r)
     {
-        $tab = in_array($r->tab, ['kehadiran', 'turnover', 'input']) ? $r->tab : 'kehadiran';
+        $tab = in_array($r->tab, ['kehadiran', 'turnover', 'disc', 'input']) ? $r->tab : 'kehadiran';
         $tahun = $r->integer('tahun') ?: (int) (Kehadiran::max('tahun') ?? now()->year);
         $orang = $this->orang(Staff::aktif());
         $kelompok = $r->kelompok && $orang->contains('kelompok', $r->kelompok) ? $r->kelompok : null;
@@ -39,6 +40,7 @@ class DashboardPegawaiController extends Controller
         ] + match ($tab) {
             'kehadiran' => $this->kehadiran($orang, $tahun, $kelompok),
             'turnover' => $this->turnover(),
+            'disc' => $this->disc($r),
             'input' => $this->formInput($orang, $tahun, $r->integer('bulan') ?: now()->month),
         });
     }
@@ -124,6 +126,40 @@ class DashboardPegawaiController extends Controller
             'turnover' => $tabel,
             'tanpaTanggal' => Staff::where('aktif', false)->whereNull('tanggal_keluar')->whereNotNull('nip')->distinct()->count('nip'),
         ];
+    }
+
+    // Peta karakter: satu baris per orang yang sudah dipetakan, kelompok = tim pemetaan
+    private function disc(Request $r): array
+    {
+        $semua = Disc::orderBy('tim')->get();
+        $tim = $semua->pluck('tim')->filter()->unique()->values();
+        $pilih = $tim->contains($r->tim) ? $r->tim : null;
+        $staff = Staff::whereIn('nip', $semua->pluck('nip'))->orderByDesc('aktif')->get()->unique('nip')->keyBy('nip');
+        $baris = $semua->when($pilih, fn ($c) => $c->where('tim', $pilih))->map(fn ($d) => (object) [
+            'disc' => $d, 'staff' => $staff[$d->nip] ?? null,
+            'katKomitmen' => Disc::kategori($d->komitmen), 'katKompetensi' => Disc::kategori($d->kompetensi),
+        ])->sortBy(fn ($b) => $b->staff->nama ?? $b->disc->nip)->values();
+
+        return [
+            'daftarTim' => $tim, 'tim' => $pilih, 'baris' => $baris,
+            // Matriks komitmen x kompetensi (kepemimpinan situasional)
+            'matriks' => collect(Disc::GAYA)->keys()->mapWithKeys(fn ($km) => [$km => collect(Disc::GAYA)->keys()
+                ->mapWithKeys(fn ($kp) => [$kp => $baris->where('katKomitmen', $km)->where('katKompetensi', $kp)->count()])]),
+            // Gaya dominan = huruf pertama profil (D/I/S/C)
+            'dominan' => $baris->countBy(fn ($b) => strtoupper(substr(trim((string) $b->disc->profil), 0, 1)) ?: '?')->sortKeys(),
+            'edit' => $this->isAdmin() && $r->nip ? Disc::firstOrNew(['nip' => $r->nip]) : null,
+            'pilihanStaff' => $this->isAdmin() ? Staff::aktif()->whereNotNull('nip')->orderBy('nama')->get()->unique('nip') : collect(),
+        ];
+    }
+
+    public function simpanDisc(Request $r)
+    {
+        abort_unless($this->isAdmin(), 403);
+        $skor = array_keys(Disc::KOMITMEN + Disc::KOMPETENSI);
+        $d = $r->validate(['nip' => 'required|exists:staffs,nip', 'tim' => 'nullable|string|max:255', 'profil' => 'nullable|string|max:20', 'dinilai_at' => 'nullable|date']
+            + array_fill_keys($skor, 'nullable|integer|min:1|max:4'));
+        Disc::updateOrCreate(['nip' => $d['nip']], $d);
+        return redirect()->route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $d['tim']])->with('ok', 'Peta karakter disimpan.');
     }
 
     private function formInput($orang, int $tahun, int $bulan): array

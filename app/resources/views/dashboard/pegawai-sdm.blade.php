@@ -10,13 +10,13 @@
 
 @section('content')
 <ul class="nav nav-tabs mb-0">
-    @foreach (['kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over'] + (Gate::allows('admin') ? ['input' => 'Input Rekap Bulanan'] : []) as $k => $l)
+    @foreach (['kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over', 'disc' => 'Peta Karakter (DISC)'] + (Gate::allows('admin') ? ['input' => 'Input Rekap Bulanan'] : []) as $k => $l)
         <li class="nav-item"><a class="nav-link {{ $tab === $k ? 'active' : '' }}" href="{{ route('dashboard.pegawai', ['tab' => $k, 'tahun' => $tahun]) }}">{{ $l }}</a></li>
     @endforeach
 </ul>
 
 <div class="card border-top-0 rounded-top-0 mb-3">
-    @if ($tab !== 'turnover')
+    @if (in_array($tab, ['kehadiran', 'input']))
     <form class="bar-filter rounded-0">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <select name="tahun" class="form-select" onchange="this.form.submit()">@foreach ($daftarTahun as $t)<option @selected($t == $tahun)>{{ $t }}</option>@endforeach</select>
@@ -116,6 +116,92 @@
             @if ($nama->isNotEmpty())<li class="list-group-item"><strong>{{ $t }}</strong> · {{ $nama->join(', ') }}</li>@endif
         @endforeach
     </ul>
+</div>
+
+@elseif ($tab === 'disc')
+    @php($D = \App\Models\Disc::class)
+    <form class="bar-filter rounded-0">
+        <input type="hidden" name="tab" value="disc">
+        <select name="tim" class="form-select" onchange="this.form.submit()">
+            <option value="">Semua tim</option>
+            @foreach ($daftarTim as $t)<option @selected($t === $tim)>{{ $t }}</option>@endforeach
+        </select>
+        @can('admin')
+            <select name="nip" class="form-select" onchange="this.form.submit()">
+                <option value="">Petakan / ubah pegawai…</option>
+                @foreach ($pilihanStaff as $s)<option value="{{ $s->nip }}">{{ $s->nama }}</option>@endforeach
+            </select>
+        @endcan
+        <span class="info">{{ $baris->count() }} orang dipetakan</span>
+    </form>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <h6 class="small text-muted text-uppercase fw-semibold">Komitmen × Kompetensi → cara memimpin</h6>
+                <table class="table table-sm table-bordered small text-center mb-0">
+                    <tr class="table-light"><th class="text-start">Komitmen ↓ / Kompetensi →</th>@foreach ($D::GAYA as $k => $g)<th>{{ $k }}</th>@endforeach</tr>
+                    @foreach ($matriks as $km => $baris2)
+                        <tr><th class="text-start table-light">{{ $km }} <small class="text-muted fw-normal">({{ $D::GAYA[$km] }})</small></th>
+                            @foreach ($baris2 as $n)<td class="{{ $n ? 'bg-primary-subtle fw-semibold' : 'text-muted' }}">{{ $n ?: '·' }}</td>@endforeach</tr>
+                    @endforeach
+                </table>
+                <div class="small text-muted mt-1">Tinggi → Delegating, Menengah → Supporting, Cukup → Coaching, Rendah → Directing.</div>
+            </div>
+            <div class="col-lg-5">
+                <h6 class="small text-muted text-uppercase fw-semibold">Gaya DISC dominan</h6>
+                @php($maks = max(1, $dominan->max() ?? 1))
+                @foreach ($dominan as $g => $n)
+                    <div class="batang"><div>{{ ['D' => 'D · Dominance', 'I' => 'I · Influence', 'S' => 'S · Steadiness', 'C' => 'C · Compliance'][$g] ?? $g }}</div>
+                        <div class="batang-jalur"><div class="batang-isi" style="width:{{ $n / $maks * 100 }}%"></div></div><div class="batang-nilai">{{ $n }}</div></div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+</div>
+
+@if ($edit)
+    <form method="post" action="{{ route('dashboard.pegawai.disc') }}" class="card mb-3"><div class="card-body">
+        @csrf <input type="hidden" name="nip" value="{{ $edit->nip }}">
+        <h6>Peta Karakter · {{ \App\Models\Staff::where('nip', $edit->nip)->value('nama') }}</h6>
+        <div class="row g-2 small">
+            <div class="col-md-3"><label class="form-label mb-0">Tim</label><input name="tim" value="{{ $edit->tim }}" list="daftarTim" class="form-control form-control-sm">
+                <datalist id="daftarTim">@foreach ($daftarTim as $t)<option>{{ $t }}</option>@endforeach</datalist></div>
+            <div class="col-md-2"><label class="form-label mb-0">Profil DISC</label><input name="profil" value="{{ $edit->profil }}" placeholder="mis. S / C-S" class="form-control form-control-sm"></div>
+            <div class="col-md-2"><label class="form-label mb-0">Tanggal nilai</label><input type="date" name="dinilai_at" value="{{ $edit->dinilai_at?->format('Y-m-d') ?? now()->format('Y-m-d') }}" class="form-control form-control-sm"></div>
+            @foreach ($D::KOMITMEN + $D::KOMPETENSI as $k => $l)
+                <div class="col-6 col-md-1"><label class="form-label mb-0">{{ $l }}</label><input name="{{ $k }}" type="number" min="1" max="4" value="{{ $edit->$k }}" class="form-control form-control-sm"></div>
+            @endforeach
+        </div>
+        <div class="mt-2 d-flex gap-2"><button class="btn btn-sm btn-primary">Simpan</button>
+            <a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim]) }}" class="btn btn-sm btn-outline-secondary">Batal</a>
+            <span class="small text-muted align-self-center">Skor 1–4. 4 pertama = komitmen, 4 berikutnya = kompetensi.</span></div>
+    </div></form>
+@endif
+
+<div class="card">
+    <div class="table-responsive">
+    <table class="table table-sm table-hover small mb-0 align-middle">
+        <thead class="table-light"><tr><th>Nama</th><th>Tim</th><th>Masa kerja</th><th>DISC</th>
+            @foreach ($D::KOMITMEN + $D::KOMPETENSI as $l)<th class="text-center" title="{{ $l }}">{{ mb_substr($l, 0, 4) }}</th>@endforeach
+            <th>Komitmen</th><th>Kompetensi</th>@can('admin')<th></th>@endcan</tr></thead>
+        @foreach ($baris as $b)
+            <tr>
+                <td>{{ $b->staff->nama ?? $b->disc->nip }}<br><small class="text-muted">{{ $b->staff->level ?? '' }} · {{ $b->staff->divisi ?? '' }}</small></td>
+                <td class="text-muted">{{ $b->disc->tim }}</td>
+                <td class="text-nowrap">{{ $b->staff?->mulai_kerja ? $b->staff->mulai_kerja->diffInYears(now()) . ' th' : '-' }}</td>
+                <td><span class="badge text-bg-light">{{ $b->disc->profil ?? '-' }}</span></td>
+                @foreach (array_keys($D::KOMITMEN + $D::KOMPETENSI) as $k)
+                    <td class="text-center {{ ($b->disc->$k ?? 9) <= 1 ? 'bg-danger-subtle' : (($b->disc->$k ?? 0) >= 4 ? 'bg-success-subtle' : '') }}">{{ $b->disc->$k ?? '·' }}</td>
+                @endforeach
+                @foreach ([[$b->disc->komitmen, $b->katKomitmen], [$b->disc->kompetensi, $b->katKompetensi]] as [$nilai, $kat])
+                    <td class="text-nowrap">@if ($kat){{ $nilai }} <span class="badge text-bg-{{ ['Tinggi' => 'success', 'Menengah' => 'primary', 'Cukup' => 'warning', 'Rendah' => 'danger'][$kat] }}">{{ $kat }}</span>
+                        <br><small class="text-muted">{{ $D::GAYA[$kat] }}</small>@else - @endif</td>
+                @endforeach
+                @can('admin')<td><a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim, 'nip' => $b->disc->nip]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>@endcan
+            </tr>
+        @endforeach
+    </table>
+    </div>
 </div>
 
 @else

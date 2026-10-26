@@ -29,9 +29,12 @@ Artisan::command('hrd:impor-dashboard {hrd} {dosen} {--simpan}', function (strin
     $h = $imp->kehadiran($hrd);
     $mk = $imp->penguasaanMk($dosen);
     $kp = $imp->kompetensi($dosen);
+    $dc = $imp->disc($hrd);
+    $rp = $imp->rapor($dosen);
+    $this->info("DISC: {$dc['orang']} orang, rapor: {$rp['dosen']} dosen ({$rp['capaian']} capaian)");
     $this->info("Mata kuliah inti: {$mk['mk']}, skill kompetensi: {$kp['skill']}");
     $this->info("Pegawai diperbarui: {$k['pegawai']}, dosen (tab db): {$k['dosen']}, dosen (tab jafung): {$j['dosen']}, rasio prodi: {$r}, data kehadiran bulanan: {$h}");
-    foreach ([...$k['tak_cocok'], ...$j['tak_cocok'], ...$mk['tak_cocok'], ...$kp['tak_cocok']] as $x) {
+    foreach ([...$k['tak_cocok'], ...$j['tak_cocok'], ...$mk['tak_cocok'], ...$kp['tak_cocok'], ...$dc['tak_cocok'], ...$rp['tak_cocok']] as $x) {
         $this->warn("  tidak cocok: $x");
     }
     $this->option('simpan') ? DB::commit() : DB::rollBack();

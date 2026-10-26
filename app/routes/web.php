@@ -11,6 +11,7 @@ use App\Http\Controllers\PengajuanController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PengaturanController;
+use App\Http\Controllers\RaporDosenController;
 use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
@@ -37,9 +38,15 @@ Route::middleware('auth')->group(function () {
     Route::post('dashboard/dosen/mk/tambah', [DashboardDosenController::class, 'tambahMk'])->name('dashboard.dosen.mk.tambah');
     Route::delete('dashboard/dosen/mk/{mk}', [DashboardDosenController::class, 'hapusMk'])->name('dashboard.dosen.mk.hapus');
     Route::get('dashboard/dosen/kompetensi', [DashboardDosenController::class, 'kompetensi'])->name('dashboard.dosen.kompetensi');
+    Route::get('dashboard/dosen/rapor', [RaporDosenController::class, 'index'])->name('dashboard.dosen.rapor.index');
+    Route::get('dashboard/dosen/rapor/{dosen}', [RaporDosenController::class, 'show'])->name('dashboard.dosen.rapor');
+    Route::post('dashboard/dosen/rapor/{dosen}', [RaporDosenController::class, 'simpan'])->name('dashboard.dosen.rapor.simpan');
+    Route::patch('dashboard/dosen/capaian/{capaian}', [RaporDosenController::class, 'status'])->name('dashboard.dosen.capaian.status');
+    Route::delete('dashboard/dosen/capaian/{capaian}', [RaporDosenController::class, 'hapus'])->name('dashboard.dosen.capaian.hapus');
     Route::post('dashboard/dosen/kompetensi/{dosen}', [DashboardDosenController::class, 'simpanKompetensi'])->name('dashboard.dosen.kompetensi.simpan');
     Route::get('dashboard/pegawai', DashboardPegawaiController::class)->name('dashboard.pegawai');
     Route::post('dashboard/pegawai/kehadiran', [DashboardPegawaiController::class, 'simpan'])->name('dashboard.pegawai.simpan');
+    Route::post('dashboard/pegawai/disc', [DashboardPegawaiController::class, 'simpanDisc'])->name('dashboard.pegawai.disc');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
     Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
     Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');
