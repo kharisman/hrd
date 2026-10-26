@@ -32,6 +32,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('dashboard/dosen', DashboardDosenController::class)->name('dashboard.dosen');
     Route::post('dashboard/dosen/rasio', [DashboardDosenController::class, 'simpanRasio'])->name('dashboard.dosen.rasio');
+    Route::get('dashboard/dosen/mk', [DashboardDosenController::class, 'mk'])->name('dashboard.dosen.mk');
+    Route::post('dashboard/dosen/mk', [DashboardDosenController::class, 'simpanMk'])->name('dashboard.dosen.mk.simpan');
+    Route::post('dashboard/dosen/mk/tambah', [DashboardDosenController::class, 'tambahMk'])->name('dashboard.dosen.mk.tambah');
+    Route::delete('dashboard/dosen/mk/{mk}', [DashboardDosenController::class, 'hapusMk'])->name('dashboard.dosen.mk.hapus');
+    Route::get('dashboard/dosen/kompetensi', [DashboardDosenController::class, 'kompetensi'])->name('dashboard.dosen.kompetensi');
+    Route::post('dashboard/dosen/kompetensi/{dosen}', [DashboardDosenController::class, 'simpanKompetensi'])->name('dashboard.dosen.kompetensi.simpan');
     Route::get('dashboard/pegawai', DashboardPegawaiController::class)->name('dashboard.pegawai');
     Route::post('dashboard/pegawai/kehadiran', [DashboardPegawaiController::class, 'simpan'])->name('dashboard.pegawai.simpan');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)

@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Dosen;
 use App\Models\Kehadiran;
+use App\Models\Kompetensi;
+use App\Models\MkInti;
 use App\Models\RasioProdi;
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
@@ -125,6 +127,121 @@ class ImporDashboard
             }
         }
         return $n;
+    }
+
+    // Tab "Penguasaan MK <prodi>" (kurikulum lama) & "... (Kur 2026)": MK inti × dosen (TRUE = menguasai)
+    public function penguasaanMk(string $file): array
+    {
+        $tabs = [
+            'Penguasaan MK SI' => ['Sistem Informasi', 'Lama'], 'Penguasaan MK IF' => ['Informatika', 'Lama'], 'Penguasaan MK BD' => ['Bisnis Digital', 'Lama'],
+            'Penugasan MK SI (Kur 2026)' => ['Sistem Informasi', '2026'], 'Penguasaan MK IF (Kur 2026)' => ['Informatika', '2026'], 'Penguasaan MK BD (Kur 2026)' => ['Bisnis Digital', '2026'],
+        ];
+        $buku = $this->tab($file, $tabs);
+        $hasil = ['mk' => 0, 'tak_cocok' => []];
+        foreach ($tabs as $tab => [$prodi, $kurikulum]) {
+            $rows = $this->baris($buku->getSheetByName($tab));
+            $j = collect($rows)->search(fn ($r) => in_array('Mata Kuliah Inti', $r, true));
+            $judul = array_map(fn ($v) => trim((string) $v), $rows[$j]);
+            $kolMk = array_search('Mata Kuliah Inti', $judul);
+            $kolIrisan = array_search('Irisan Prodi', $judul);
+            $kolJumlah = array_search('Jumlah Dosen', $judul);
+            $kolButuh = array_search('Kebutuhan dosen', $judul);
+
+            // Kolom dosen = antara "Irisan Prodi" dan "Jumlah Dosen" (judulnya nama singkat)
+            $dosen = [];
+            foreach (range($kolIrisan + 1, $kolJumlah - 1) as $c) {
+                ($d = $this->dosenSingkat($judul[$c], $prodi)) ? $dosen[$c] = $d->id : $hasil['tak_cocok'][] = "{$judul[$c]} ($tab)";
+            }
+            foreach (array_slice($rows, $j + 1) as $urut => $r) {
+                $nama = trim((string) ($r[$kolMk] ?? ''));
+                if (!$nama || !is_numeric($r[$kolJumlah] ?? null) && !collect($dosen)->keys()->contains(fn ($c) => is_bool($r[$c] ?? null))) {
+                    continue;
+                }
+                $mk = MkInti::updateOrCreate(['program_studi' => $prodi, 'kurikulum' => $kurikulum, 'nama' => $nama], [
+                    'bidang_ilmu' => $r[$kolMk + 1] ?: null, 'semester' => $r[$kolMk + 2] ?: null, 'irisan' => $r[$kolIrisan] ?: null,
+                    'kebutuhan' => (int) ($r[$kolButuh] ?? 0) ?: 2, 'urutan' => $urut,
+                    // Solusi/catatan: teks pertama sesudah kolom Ketercapaian
+                    'solusi' => collect(array_slice($r, $kolButuh + 2))->first(fn ($v) => is_string($v) && trim($v) && !in_array(trim($v), ['Tercapai', 'Tidak Tercapai'])),
+                ]);
+                $mk->dosen()->sync(collect($dosen)->filter(fn ($id, $c) => ($r[$c] ?? false) === true)->values());
+                $hasil['mk']++;
+            }
+        }
+        return $hasil;
+    }
+
+    // Tab "Kompetensi <prodi> <tahun>": blok per dosen ("Nama Dosen : ..."), skill personal & jabatan
+    public function kompetensi(string $file): array
+    {
+        $tabs = [];
+        foreach (['SI', 'IF', 'BD'] as $p) {
+            foreach ([2025, 2026] as $t) {
+                $tabs["Kompetensi $p $t"] = $t;
+            }
+        }
+        $buku = $this->tab($file, $tabs);
+        $hasil = ['skill' => 0, 'tak_cocok' => []];
+        foreach ($tabs as $tab => $tahun) {
+            $dosen = null;
+            $kelompok = null;
+            foreach ($this->baris($buku->getSheetByName($tab)) as $r) {
+                $label = trim((string) ($r[1] ?? ''));
+                if (str_starts_with($label, 'Nama Dosen') && str_starts_with(trim((string) ($r[2] ?? '')), ':')) {
+                    $nama = trim(ltrim(trim($r[2]), ':'));
+                    $dosen = $this->dosenBernama($nama) ?? $this->dosenSingkat($nama, null);
+                    $dosen ?: $hasil['tak_cocok'][] = "$nama ($tab)";
+                    $kelompok = null;
+                } elseif (in_array($label, ['Kompetensi Personal', 'Kompetensi Jabatan'])) {
+                    $kelompok = $label === 'Kompetensi Personal' ? 'personal' : 'jabatan';
+                } elseif ($dosen && $kelompok && $label && is_numeric($r[2] ?? null)) {
+                    Kompetensi::updateOrCreate(['dosen_id' => $dosen->id, 'tahun' => $tahun, 'kelompok' => $kelompok, 'skill' => $label], [
+                        'sekarang' => (int) $r[2], 'target' => is_numeric($r[3] ?? null) ? (int) $r[3] : null,
+                        'rencana' => is_string($r[4] ?? null) ? mb_substr(trim($r[4]), 0, 255) : null,
+                        'catatan' => is_string($r[8] ?? null) ? mb_substr(trim($r[8]), 0, 255) : null,
+                    ]);
+                    $hasil['skill']++;
+                }
+            }
+        }
+        return $hasil;
+    }
+
+    /**
+     * Nama singkat di judul kolom spreadsheet → dosen: "Fatma", "Eka H", "Eka PS", "D Tri", "Hendra Hadi".
+     * Kata pertama = awal nama depan; kata berikutnya = awal kata selanjutnya, atau huruf kapital = inisial berurutan.
+     * Utamakan dosen prodi yang sama; hanya diterima bila kandidatnya tunggal.
+     */
+    private function dosenSingkat(string $singkat, ?string $prodi): ?Dosen
+    {
+        $kata = fn ($s) => array_values(array_filter(explode(' ', preg_replace('/[^a-z ]/', ' ', strtolower(explode(',', $s)[0])))));
+        $cari = preg_split('/\s+/', trim($singkat));
+        $cocok = function ($d) use ($cari, $kata) {
+            $n = $kata($d->nama);
+            $awal = strtolower(preg_replace('/[^A-Za-z]/', '', $cari[0]));
+            // Kata pertama boleh di posisi mana pun ("Jhonsen" = Muhammad Jhonsen, "Hendra Hadi" = Dr. Hendra Hadiwijaya);
+            // potongan berikutnya harus cocok berurutan dengan kata-kata sesudahnya (subsequence)
+            foreach ($n as $i => $w) {
+                if (!str_starts_with($w, $awal)) {
+                    continue;
+                }
+                $sisa = array_slice($n, $i + 1);
+                foreach (array_slice($cari, 1) as $c) {
+                    foreach (ctype_upper($c) && strlen($c) <= 3 ? str_split(strtolower($c)) : [strtolower($c)] as $h) {
+                        do {
+                            if (!$sisa) {
+                                continue 4;
+                            }
+                        } while (!str_starts_with(array_shift($sisa), $h));
+                    }
+                }
+                return true;
+            }
+            return false;
+        };
+        $semua = Dosen::orderByDesc('aktif')->get()->filter($cocok);
+        $sama = $prodi ? $semua->where('program_studi', $prodi) : collect();
+        $pilih = $sama->count() === 1 ? $sama : $semua->where('aktif', true);
+        return $pilih->count() === 1 ? $pilih->first() : ($semua->count() === 1 ? $semua->first() : null);
     }
 
     // Tab Rasio: blok "Rasio Dosen TA xxxx/yyyy" berisi prodi, jumlah dosen, jumlah mahasiswa, rasio, target

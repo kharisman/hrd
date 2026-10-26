@@ -16,6 +16,7 @@
 @endphp
 
 @section('content')
+@include('dashboard._tab-dosen')
 {{-- Filter prodi --}}
 <ul class="nav nav-pills mb-3 small">
     <li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen') }}">Semua Prodi</a></li>
