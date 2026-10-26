@@ -12,7 +12,7 @@ class Staff extends Model
     protected $connection = 'mysql';
     protected $table = 'staffs';
     protected $guarded = ['id'];
-    protected $casts = ['tgl_lahir' => 'date', 'mulai_kerja' => 'date', 'aktif' => 'boolean'];
+    protected $casts = ['tgl_lahir' => 'date', 'mulai_kerja' => 'date', 'tanggal_keluar' => 'date', 'kontrak_berakhir' => 'date', 'aktif' => 'boolean'];
 
     // Pegawai aktif = akun login eUniversity-nya aktif (diisi sinkron)
     public function scopeAktif($q)

@@ -9,7 +9,7 @@ class Dosen extends Model
     protected $connection = 'mysql';
     protected $table = 'dosens';
     protected $guarded = ['id'];
-    protected $casts = ['tmt_jabfung' => 'date', 'tgl_lahir' => 'date', 'mulai_kerja' => 'date', 'serdos' => 'boolean', 'aktif' => 'boolean'];
+    protected $casts = ['tmt_jabfung' => 'date', 'tmt_dosen' => 'date', 'tgl_lahir' => 'date', 'mulai_kerja' => 'date', 'serdos' => 'boolean', 'aktif' => 'boolean'];
 
     const AGAMA = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
     const GOL_DAR = ['A', 'B', 'AB', 'O'];

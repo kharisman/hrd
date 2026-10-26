@@ -118,7 +118,7 @@ class DosenController extends Controller
     {
         return $this->lokalBiodata($d) + collect($d)->only([
             'staff_id', 'nidn', 'email', 'program_studi', 'status_dosen', 'pendidikan_terakhir',
-            'jabatan_fungsional', 'tmt_jabfung', 'angka_kredit', 'serdos', 'aktif',
+            'jabatan_fungsional', 'tmt_jabfung', 'tmt_dosen', 'angka_kredit', 'serdos', 'aktif',
         ])->all();
     }
 
@@ -133,6 +133,7 @@ class DosenController extends Controller
             'pendidikan_terakhir' => 'nullable|in:S1,S2,S3',
             'jabatan_fungsional' => ['nullable', Rule::in(Dosen::JENJANG)],
             'tmt_jabfung' => 'nullable|date',
+            'tmt_dosen' => 'nullable|date',
             'angka_kredit' => 'nullable|integer|min:0',
         ], ['staff_id.unique' => 'Pegawai ini sudah terdaftar sebagai dosen.', 'nidn.unique' => 'NIDN sudah dipakai.']);
         $data['serdos'] = $request->boolean('serdos');

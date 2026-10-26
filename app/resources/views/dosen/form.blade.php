@@ -38,6 +38,8 @@
         <div class="col-md-3"><label class="form-label">Jabatan Fungsional</label><select name="jabatan_fungsional" class="form-select">{!! $sel('jabatan_fungsional', \App\Models\Dosen::JENJANG) !!}</select></div>
         <div class="col-md-3"><label class="form-label">TMT Jabfung</label><input type="date" name="tmt_jabfung" value="{{ $v('tmt_jabfung') }}" class="form-control"></div>
         <div class="col-md-3"><label class="form-label">Angka Kredit</label><input type="number" min="0" name="angka_kredit" value="{{ $v('angka_kredit') }}" class="form-control"></div>
+        <div class="col-md-3"><label class="form-label">TMT Dosen</label><input type="date" name="tmt_dosen" value="{{ $v('tmt_dosen') }}" class="form-control">
+            <div class="form-text">Mulai sebagai dosen (SK). Dasar "jafung seharusnya" di Dashboard Dosen.</div></div>
     </div>
     <div class="d-flex gap-4 mt-3">
         <div class="form-check"><input type="checkbox" name="serdos" value="1" id="serdos" class="form-check-input" @checked($v('serdos'))><label for="serdos" class="form-check-label">Sudah Sertifikasi Dosen</label></div>
