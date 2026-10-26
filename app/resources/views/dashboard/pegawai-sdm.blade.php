@@ -127,9 +127,9 @@
             @foreach ($daftarTim as $t)<option @selected($t === $tim)>{{ $t }}</option>@endforeach
         </select>
         @can('admin')
-            <select name="nip" class="form-select" onchange="this.form.submit()">
+            <select name="staff" class="form-select" onchange="this.form.submit()">
                 <option value="">Petakan / ubah pegawai…</option>
-                @foreach ($pilihanStaff as $s)<option value="{{ $s->nip }}">{{ $s->nama }}</option>@endforeach
+                @foreach ($pilihanStaff as $s)<option value="{{ $s->id }}">{{ $s->nama }}</option>@endforeach
             </select>
         @endcan
         <span class="info">{{ $baris->count() }} orang dipetakan</span>
@@ -161,8 +161,8 @@
 
 @if ($edit)
     <form method="post" action="{{ route('dashboard.pegawai.disc') }}" class="card mb-3"><div class="card-body">
-        @csrf <input type="hidden" name="nip" value="{{ $edit->nip }}">
-        <h6>Peta Karakter · {{ \App\Models\Staff::where('nip', $edit->nip)->value('nama') }}</h6>
+        @csrf <input type="hidden" name="staff_id" value="{{ $edit->staff_id }}">
+        <h6>Peta Karakter · {{ $edit->staff->nama ?? \App\Models\Staff::whereKey($edit->staff_id)->value('nama') }}</h6>
         <div class="row g-2 small">
             <div class="col-md-3"><label class="form-label mb-0">Tim</label><input name="tim" value="{{ $edit->tim }}" list="daftarTim" class="form-control form-control-sm">
                 <datalist id="daftarTim">@foreach ($daftarTim as $t)<option>{{ $t }}</option>@endforeach</datalist></div>
@@ -186,7 +186,7 @@
             <th>Komitmen</th><th>Kompetensi</th>@can('admin')<th></th>@endcan</tr></thead>
         @foreach ($baris as $b)
             <tr>
-                <td>{{ $b->staff->nama ?? $b->disc->nip }}<br><small class="text-muted">{{ $b->staff->level ?? '' }} · {{ $b->staff->divisi ?? '' }}</small></td>
+                <td>{{ $b->staff->nama ?? '-' }}<br><small class="text-muted">{{ $b->staff->level ?? '' }} · {{ $b->staff->divisi ?? '' }}</small></td>
                 <td class="text-muted">{{ $b->disc->tim }}</td>
                 <td class="text-nowrap">{{ $b->staff?->mulai_kerja ? $b->staff->mulai_kerja->diffInYears(now()) . ' th' : '-' }}</td>
                 <td><span class="badge text-bg-light">{{ $b->disc->profil ?? '-' }}</span></td>
@@ -197,7 +197,7 @@
                     <td class="text-nowrap">@if ($kat){{ $nilai }} <span class="badge text-bg-{{ ['Tinggi' => 'success', 'Menengah' => 'primary', 'Cukup' => 'warning', 'Rendah' => 'danger'][$kat] }}">{{ $kat }}</span>
                         <br><small class="text-muted">{{ $D::GAYA[$kat] }}</small>@else - @endif</td>
                 @endforeach
-                @can('admin')<td><a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim, 'nip' => $b->disc->nip]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>@endcan
+                @can('admin')<td><a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim, 'staff' => $b->disc->staff_id]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>@endcan
             </tr>
         @endforeach
     </table>
@@ -212,8 +212,8 @@
             <thead class="table-light sticky-top"><tr><th>Nama</th><th>Divisi</th><th style="width:150px">Terlambat (menit)</th><th style="width:150px">Tidak hadir (hari)</th></tr></thead>
             @foreach ($baris as $o)
                 <tr><td>{{ $o->nama }}</td><td class="text-muted">{{ $o->divisi }}</td>
-                    <td><input name="terlambat[{{ $o->nip }}]" type="number" min="0" value="{{ $isian[$o->nip]->terlambat_menit ?? '' }}" class="form-control form-control-sm"></td>
-                    <td><input name="absen[{{ $o->nip }}]" type="number" min="0" max="31" step="0.5" value="{{ isset($isian[$o->nip]->tidak_hadir_hari) ? $isian[$o->nip]->tidak_hadir_hari + 0 : '' }}" class="form-control form-control-sm"></td></tr>
+                    <td><input name="terlambat[{{ $o->id }}]" type="number" min="0" value="{{ $isian[$o->id]->terlambat_menit ?? '' }}" class="form-control form-control-sm"></td>
+                    <td><input name="absen[{{ $o->id }}]" type="number" min="0" max="31" step="0.5" value="{{ isset($isian[$o->id]->tidak_hadir_hari) ? $isian[$o->id]->tidak_hadir_hari + 0 : '' }}" class="form-control form-control-sm"></td></tr>
             @endforeach
         </table>
         </div>

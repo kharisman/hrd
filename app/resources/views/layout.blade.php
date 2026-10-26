@@ -49,12 +49,15 @@
     $admin = Gate::allows('admin');
     // Item: [route, pola aktif, ikon, label]. Grup yang bisa dilipat: ['grup', id, judul, ikon, route induk|null, item]
     // Item grup: [route, ikon, label, 'aktif' => pola?]; tanpa pola: route-nya sendiri, untuk *.index juga turunannya (mis. jenis-cuti.*)
+    // Dashboard analitik: admin semua, Warek I dosen, Warek II pegawai. Lebih dari satu → digabung dalam grup Dashboard.
+    $peran = \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : []);
+    $dasbor = array_values(array_filter([
+        $admin || $peran->contains('warek1') ? ['dashboard.dosen', 'clipboard-data', 'Dosen', 'aktif' => 'dashboard.dosen*'] : null,
+        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Pegawai', 'aktif' => 'dashboard.pegawai*'] : null,
+    ]));
     $menu = array_filter([
-        ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
-        $admin || \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : [])->contains('warek1')
-            ? ['dashboard.dosen', 'dashboard.dosen*', 'clipboard-data', 'Dashboard Dosen'] : null,
-        $admin || \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : [])->contains('warek2')
-            ? ['dashboard.pegawai', 'dashboard.pegawai*', 'person-lines-fill', 'Dashboard Pegawai'] : null,
+        $dasbor ? ['grup', 'grupDashboard', 'Dashboard', 'speedometer2', null, [['dashboard', 'house', 'Ringkasan', 'aktif' => 'dashboard'], ...$dasbor]]
+            : ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
         $admin ? ['grup', 'grupMaster', 'Master Data', 'database', null, [
             ['staff.index', 'people', 'Data Pegawai', 'aktif' => ['staff.index', 'staff.show', 'staff.create', 'staff.edit']],
             ['staff.atasan', 'diagram-3', 'Atasan & Bawahan', 'aktif' => 'staff.atasan*'],

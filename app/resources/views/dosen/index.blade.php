@@ -19,7 +19,7 @@
     </select>
     <select name="prodi" class="form-select" onchange="this.form.submit()">
         <option value="">Semua prodi</option>
-        @foreach (\App\Models\Dosen::PRODI as $p)<option @selected(request('prodi') == $p)>{{ $p }}</option>@endforeach
+        @foreach (\App\Models\Dosen::daftarProdi() as $p)<option @selected(request('prodi') == $p)>{{ $p }}</option>@endforeach
     </select>
     <select name="jabfung" class="form-select" onchange="this.form.submit()">
         <option value="">Semua jabfung</option>

@@ -143,7 +143,7 @@ class StaffController extends Controller
 
     private function validasi(Request $request, ?Staff $staff = null): array
     {
-        return $request->validate($this->aturanBiodata() + [
+        $d = $request->validate($this->aturanBiodata() + [
             // NIP tidak dicek unik di sini: satu orang bisa punya beberapa akun staff (beda divisi/role). API yang memutuskan (409).
             'nip' => 'required|string|max:30',
             'id_divisi' => 'required|integer',
@@ -152,6 +152,12 @@ class StaffController extends Controller
             'atasan_id' => ['nullable', Rule::exists('staffs', 'id'), Rule::notIn([$staff?->id])],
             'status_kepegawaian' => ['nullable', Rule::in(Staff::STATUS)],
         ], ['atasan_id.not_in' => 'Atasan tidak boleh diri sendiri.']);
+        // Pasangan divisi × level harus ada di master struktur eUniversity (bila sudah disinkron)
+        $struktur = \App\Models\Struktur::where('aktif', true);
+        if ($struktur->exists() && !$struktur->where(['id_divisi' => $d['id_divisi'], 'id_level' => $d['id_level']])->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['id_level' => 'Level ini tidak ada di divisi tersebut menurut struktur eUniversity.']);
+        }
+        return $d;
     }
 
     private function payloadStaff(array $d): array
@@ -171,13 +177,15 @@ class StaffController extends Controller
         ];
     }
 
-    // ponytail: pilihan divisi/level diambil dari staff yang sudah tersinkron, bukan memanggil API
-    // (jaringan lambat). Divisi/level baru di eUniversity muncul setelah sinkron.
+    // Pilihan divisi/level dari master struktur eUniversity (tersinkron hrd:sync); cadangan: yang dipakai pegawai
     private function pilihan(?Staff $kecuali = null): array
     {
+        $struktur = \App\Models\Struktur::where('aktif', true)->get();
         return [
-            'divisiList' => Staff::whereNotNull('id_divisi')->orderBy('divisi')->pluck('divisi', 'id_divisi'),
-            'levelList' => Staff::whereNotNull('id_level')->orderBy('level')->pluck('level', 'id_level'),
+            'divisiList' => $struktur->isNotEmpty() ? $struktur->sortBy('divisi')->pluck('divisi', 'id_divisi') : Staff::whereNotNull('id_divisi')->orderBy('divisi')->pluck('divisi', 'id_divisi'),
+            'levelList' => $struktur->isNotEmpty() ? $struktur->sortBy('level')->pluck('level', 'id_level') : Staff::whereNotNull('id_level')->orderBy('level')->pluck('level', 'id_level'),
+            // Level yang sah per divisi (untuk menyaring pilihan level di form)
+            'strukturMap' => $struktur->groupBy('id_divisi')->map->pluck('id_level'),
             // Calon atasan: pegawai aktif (+ atasan yang sedang terpasang, supaya tidak hilang dari pilihan)
             'atasanList' => Staff::where(fn ($q) => $q->where('aktif', true)->orWhere('id', $kecuali?->atasan_id))
                 ->when($kecuali, fn ($q) => $q->where('id', '!=', $kecuali->id))->orderBy('nama')->get(['id', 'nama', 'divisi', 'level']),

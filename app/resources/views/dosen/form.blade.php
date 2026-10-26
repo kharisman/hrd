@@ -20,7 +20,7 @@
     <div class="row g-3">
         <div class="col-md-3"><label class="form-label">NIDN / NUPTK</label><input name="nidn" value="{{ $v('nidn') }}" class="form-control @error('nidn') is-invalid @enderror" placeholder="Kosong jika belum ada">@error('nidn')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
         <div class="col-md-3"><label class="form-label">Status Dosen</label><select name="status_dosen" class="form-select">{!! $sel('status_dosen', \App\Models\Dosen::STATUS) !!}</select></div>
-        <div class="col-md-3"><label class="form-label">Program Studi</label><select name="program_studi" class="form-select">{!! $sel('program_studi', \App\Models\Dosen::PRODI) !!}</select></div>
+        <div class="col-md-3"><label class="form-label">Program Studi</label><select name="program_studi" class="form-select">{!! $sel('program_studi', \App\Models\Dosen::daftarProdi()) !!}</select></div>
         <div class="col-md-3"><label class="form-label">Email</label><input type="email" name="email" value="{{ $v('email') }}" class="form-control"></div>
         <div class="col-12">
             <label class="form-label">Data Pegawai</label>

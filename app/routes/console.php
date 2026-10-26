@@ -13,6 +13,10 @@ Artisan::command('hrd:sync', function () {
         foreach (app(App\Services\Sinkron::class)->jalankan() as $k => $v) {
             $this->line(str_pad($k, 24) . $v);
         }
+        $this->info('Menarik data akademik (prodi, mahasiswa, kelas, kurikulum)...');
+        foreach (app(App\Services\SinkronAkademik::class)->jalankan() as $k => $v) {
+            $this->line(str_pad($k, 24) . $v);
+        }
     } finally {
         $api->logout($token);
     }

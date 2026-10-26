@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-// Rekap bulanan per NIP: total menit terlambat & hari tidak hadir
+// Rekap bulanan per orang (staff_id = akun staff utama, lihat Staff::utama): total menit terlambat & hari tidak hadir
 class Kehadiran extends Model
 {
     protected $connection = 'mysql';
@@ -13,4 +13,9 @@ class Kehadiran extends Model
     protected $casts = ['tidak_hadir_hari' => 'float'];
 
     const BULAN = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    public function staff()
+    {
+        return $this->belongsTo(Staff::class);
+    }
 }

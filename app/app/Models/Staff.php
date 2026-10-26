@@ -15,6 +15,21 @@ class Staff extends Model
     protected $casts = ['tgl_lahir' => 'date', 'mulai_kerja' => 'date', 'tanggal_keluar' => 'date', 'kontrak_berakhir' => 'date', 'aktif' => 'boolean'];
 
     // Pegawai aktif = akun login eUniversity-nya aktif (diisi sinkron)
+    /**
+     * Akun staff utama satu orang (NIP sama bisa punya beberapa akun): aktif dulu, lalu id terkecil.
+     * Data per orang (DISC, kehadiran) disimpan di akun ini.
+     */
+    public static function utama(?string $nip): ?self
+    {
+        return $nip ? static::where('nip', $nip)->orderByDesc('aktif')->orderBy('id')->first() : null;
+    }
+
+    // Satu baris per orang: akun utama tiap NIP
+    public static function perOrang($query)
+    {
+        return $query->whereNotNull('nip')->orderByDesc('aktif')->orderBy('id')->get()->unique('nip')->sortBy('nama')->values();
+    }
+
     public function scopeAktif($q)
     {
         return $q->where('aktif', true);

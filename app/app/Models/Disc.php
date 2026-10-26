@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-// Peta karakter (DISC) per orang. Komitmen = rata-rata inisiatif, tanggung jawab, totalitas, ekstra;
+// Peta karakter (DISC) per orang (staff_id = akun staff utama orang itu, lihat Staff::utama). Komitmen = rata-rata inisiatif, tanggung jawab, totalitas, ekstra;
 // kompetensi = rata-rata pengalaman, sertifikasi, dukungan, proyek (skala 1–4).
 // Kategori & cara memimpin mengikuti spreadsheet lama (kepemimpinan situasional).
 class Disc extends Model
@@ -12,6 +12,11 @@ class Disc extends Model
     protected $connection = 'mysql';
     protected $table = 'disc';
     protected $guarded = ['id'];
+
+    public function staff()
+    {
+        return $this->belongsTo(Staff::class);
+    }
     protected $casts = ['dinilai_at' => 'date'];
 
     const KOMITMEN = ['inisiatif' => 'Inisiatif', 'tanggung_jawab' => 'Responsibility', 'totalitas' => 'Totalitas', 'ekstra' => 'Extra'];

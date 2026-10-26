@@ -16,7 +16,7 @@
 
 @php
     $tercapai = $mk->filter(fn ($m) => $m->gap >= 0)->count();
-    $perDosen = $dosen->mapWithKeys(fn ($d) => [$d->id => $mk->filter(fn ($m) => $m->dosen->contains('id', $d->id))->count()]);
+    $perDosen = $dosen->mapWithKeys(fn ($d) => [$d->id => $mk->filter(fn ($m) => in_array($d->id, $m->kuasai))->count()]);
 @endphp
 
 @section('content')
@@ -24,7 +24,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <ul class="nav nav-pills small">
-        @foreach (\App\Models\Dosen::PRODI as $p)
+        @foreach (\App\Models\Dosen::daftarProdi() as $p)
             <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen.mk', ['prodi' => $p]) }}">{{ $p }}</a></li>
         @endforeach
     </ul>
@@ -58,7 +58,8 @@
 <form method="post" action="{{ route('dashboard.dosen.mk.simpan') }}" class="card mb-3">
     @csrf <input type="hidden" name="prodi" value="{{ $prodi }}"><input type="hidden" name="kurikulum" value="{{ $kurikulum }}">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Distribusi Mata Kuliah Inti ke Dosen <small class="text-muted">· {{ $prodi }}, kurikulum {{ $kurikulum }}</small></span>
+        <span>Distribusi Mata Kuliah Inti ke Dosen <small class="text-muted">· {{ $prodi }}, kurikulum {{ $kurikulum }}</small>
+            <br><small class="text-muted">@if ($dipakaiAngkatan->isNotEmpty())Dipakai {{ $dipakaiAngkatan->count() }} angkatan aktif (masuk {{ $dipakaiAngkatan->first() }}{{ $dipakaiAngkatan->count() > 1 ? ' – ' . $dipakaiAngkatan->last() : '' }})@else Tidak dipakai angkatan aktif @endif</small></span>
         @if ($ubah)<button class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Simpan</button>@endif
     </div>
     <div class="table-responsive" style="max-height:640px">
@@ -74,16 +75,29 @@
         @foreach ($mk as $i => $m)
             <tr class="{{ $m->gap < 0 ? 'table-warning' : '' }}">
                 <td class="text-muted">{{ $i + 1 }}</td>
-                <td>{{ $m->nama }}<br><small class="text-muted">{{ $m->bidang_ilmu }}{{ $m->irisan ? ' · ' . $m->irisan : '' }}</small></td>
+                <td>{{ $m->nama }}
+                    @if ($m->kode_mk)<span class="badge text-bg-light" title="Kode MK di kurikulum eUniversity">{{ $m->kode_mk }}{{ $m->sks ? " · {$m->sks} SKS" : '' }}</span>
+                    @elseif ($m->id_kurikulum_api)<span class="badge text-bg-warning" title="Nama tidak ditemukan di kurikulum eUniversity">belum tertaut</span>@endif
+                    <br><small class="text-muted">{{ $m->bidang_ilmu }}{{ $m->irisan ? ' · ' . $m->irisan : '' }}</small>
+                    @if ($ubah && $materiApi->isNotEmpty())
+                        @php($pilih = $m->kode_mk ?? $saran[$m->id] ?? null)
+                        <select name="kode[{{ $m->id }}]" class="form-select form-select-sm mt-1 {{ !$m->kode_mk && $pilih ? 'border-warning' : '' }}" style="max-width:320px">
+                            <option value="">— tautkan ke MK eUniversity —</option>
+                            @foreach ($materiApi as $kode => $label)<option value="{{ $kode }}" @selected($pilih === $kode)>{{ $label }}</option>@endforeach
+                        </select>
+                        @if (!$m->kode_mk && $pilih)<small class="text-warning">Saran otomatis, periksa lalu Simpan</small>@endif
+                    @endif</td>
                 <td>{{ $m->semester }}</td>
                 @foreach ($dosen as $d)
                     @php($ya = $m->dosen->contains('id', $d->id))
-                    <td class="text-center {{ $ya ? 'bg-success-subtle' : '' }}">
+                    @php($ajar = $pernah($m, $d))
+                    <td class="text-center {{ $ya ? 'bg-success-subtle' : ($ajar ? 'bg-info-subtle' : '') }}" title="{{ $ajar ? 'Pernah mengampu (eUniversity)' : '' }}">
                         @if ($ubah)<input type="checkbox" name="kuasai[{{ $m->id }}][{{ $d->id }}]" value="1" class="form-check-input" @checked($ya)>
                         @elseif ($ya)<i class="bi bi-check-lg text-success"></i>@endif
+                        @if ($ajar)<i class="bi bi-easel2 text-info small"></i>@endif
                     </td>
                 @endforeach
-                <td class="text-center fw-semibold">{{ $m->dosen->count() }}</td>
+                <td class="text-center fw-semibold" title="{{ $m->dosen->count() }} dicentang HRD + {{ count($m->kuasai) - $m->dosen->count() }} dari eUniversity">{{ count($m->kuasai) }}</td>
                 <td class="text-center">@if ($ubah)<input name="kebutuhan[{{ $m->id }}]" type="number" min="0" max="20" value="{{ $m->kebutuhan }}" class="form-control form-control-sm" style="width:60px">@else{{ $m->kebutuhan }}@endif</td>
                 <td class="text-center"><span class="badge text-bg-{{ $m->gap < 0 ? 'danger' : 'success' }}">{{ $m->gap > 0 ? '+' : '' }}{{ $m->gap }}</span></td>
                 <td>@if ($ubah)<input name="solusi[{{ $m->id }}]" value="{{ $m->solusi }}" class="form-control form-control-sm">@else<small>{{ $m->solusi }}</small>@endif</td>
@@ -98,7 +112,8 @@
         </tfoot>
     </table>
     </div>
-    <div class="card-footer small text-muted">GAP = jumlah dosen yang menguasai − kebutuhan. Baris kuning = belum tercapai. * = dosen nonaktif.</div>
+    <div class="card-footer small text-muted">GAP = jumlah dosen yang menguasai − kebutuhan. Baris kuning = belum tercapai. * = dosen nonaktif.
+        <i class="bi bi-easel2 text-info"></i> sel biru = pernah mengampu MK ini di eUniversity (6 periode terakhir) dan otomatis dihitung menguasai; centang = penilaian HRD.</div>
 </form>
 @if ($ubah)
     @foreach ($mk as $m)
@@ -113,7 +128,17 @@
         @csrf <input type="hidden" name="program_studi" value="{{ $prodi }}">
         <h6>Tambah Mata Kuliah Inti</h6>
         <div class="row g-2">
-            <div class="col-md-8"><label class="form-label small mb-0">Nama MK</label><input name="nama" class="form-control form-control-sm" required></div>
+            @php($sudah = $mk->pluck('kode_mk')->filter()->all())
+            @if ($materiApi->isNotEmpty())
+                {{-- Kurikulum sudah tertaut: pilih dari MK eUniversity (nama, SKS, semester ikut API) --}}
+                <div class="col-md-8"><label class="form-label small mb-0">MK dari kurikulum eUniversity</label>
+                    <select name="kode_mk" class="form-select form-select-sm" required>
+                        <option value="">Pilih…</option>
+                        @foreach ($materiApi->except($sudah) as $kode => $label)<option value="{{ $kode }}">{{ $label }}</option>@endforeach
+                    </select></div>
+            @else
+                <div class="col-md-8"><label class="form-label small mb-0">Nama MK</label><input name="nama" class="form-control form-control-sm" required></div>
+            @endif
             <div class="col-md-4"><label class="form-label small mb-0">Kurikulum</label><input name="kurikulum" value="{{ $kurikulum ?? now()->year }}" class="form-control form-control-sm" required></div>
             <div class="col-md-6"><label class="form-label small mb-0">Bidang ilmu</label><input name="bidang_ilmu" class="form-control form-control-sm"></div>
             <div class="col-md-3"><label class="form-label small mb-0">Semester</label><select name="semester" class="form-select form-select-sm"><option></option><option>Ganjil</option><option>Genap</option></select></div>

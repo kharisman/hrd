@@ -41,7 +41,6 @@ class ImporDashboard
             }
             $status = $r[$kol('Status Karyawan')] ?? null;
             Staff::whereIn('id', $ids)->update(array_filter([
-                'jabatan' => $r[$kol('Jabatan')] ?: null,
                 'status_kepegawaian' => ['Karyawan Kontrak' => 'Kontrak', 'Karyawan Tetap' => 'Tetap'][$status] ?? null,
                 'pendidikan_terakhir' => $r[$kol('Pendidikan Terakhir')] ?: null,
                 'tanggal_keluar' => $r[$kol('Status')] === 'nonaktif' ? $this->tgl($r[$kol('Tanggal Terakhir Kerja')]) : null,
@@ -116,13 +115,13 @@ class ImporDashboard
             $awal = array_search('Januari', $rows[$judul], true);
             foreach (array_slice($rows, $judul + 2) as $r) {
                 $nip = trim((string) ($r[2] ?? ''));
-                if (!preg_match('/^\d+\.PCT\.\d+$/', $nip) || !is_numeric($r[5] ?? null)) {
+                if (!preg_match('/^\d+\.PCT\.\d+$/', $nip) || !is_numeric($r[5] ?? null) || !($staffId = Staff::utama($nip)?->id)) {
                     continue;
                 }
                 foreach (range(0, 11) as $i) {
                     $v = $r[$awal + $i] ?? null;
                     if (is_numeric($v)) {
-                        Kehadiran::updateOrCreate(['nip' => $nip, 'tahun' => (int) $r[5], 'bulan' => $i + 1], [$kolom => $v]);
+                        Kehadiran::updateOrCreate(['staff_id' => $staffId, 'tahun' => (int) $r[5], 'bulan' => $i + 1], [$kolom => $v]);
                         $n++;
                     }
                 }
@@ -276,7 +275,7 @@ class ImporDashboard
                 }
                 $skor = array_combine([...array_keys(Disc::KOMITMEN), ...array_keys(Disc::KOMPETENSI)],
                     array_map(fn ($i) => is_numeric($r[$awal + $i] ?? null) ? (int) $r[$awal + $i] : null, range(0, 7)));
-                Disc::updateOrCreate(['nip' => $staff->nip], $skor + [
+                Disc::updateOrCreate(['staff_id' => Staff::utama($staff->nip)->id], $skor + [
                     'tim' => $tim, 'profil' => trim((string) ($r[$kProfil] ?? '')) ?: null, 'dinilai_at' => $kTgl !== false ? $this->tgl($r[$kTgl] ?? null) : null,
                 ]);
                 $hasil['orang']++;
@@ -341,8 +340,8 @@ class ImporDashboard
             }
             // DISC di profil dosen: dipakai bila pegawainya belum dipetakan di file HRD
             $disc = collect($rows)->first(fn ($r) => trim((string) ($r[0] ?? '')) === 'DISC')[1] ?? null;
-            if ($disc && ($nip = $dosen->staff?->nip)) {
-                Disc::firstOrCreate(['nip' => $nip], ['profil' => trim($disc), 'tim' => 'Prodi ' . $dosen->program_studi]);
+            if ($disc && ($utama = Staff::utama($dosen->staff?->nip))) {
+                Disc::firstOrCreate(['staff_id' => $utama->id], ['profil' => trim($disc), 'tim' => 'Prodi ' . $dosen->program_studi]);
             }
         }
 
@@ -488,7 +487,7 @@ class ImporDashboard
     private function prodi(?string $v): ?string
     {
         $v = trim((string) $v);
-        foreach (Dosen::PRODI as $p) {
+        foreach (Dosen::daftarProdi() as $p) {
             if ($v && str_ends_with($v, $p)) {
                 return $p;
             }

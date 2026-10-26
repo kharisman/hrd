@@ -20,7 +20,7 @@
 {{-- Filter prodi --}}
 <ul class="nav nav-pills mb-3 small">
     <li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen') }}">Semua Prodi</a></li>
-    @foreach (\App\Models\Dosen::PRODI as $p)
+    @foreach (\App\Models\Dosen::daftarProdi() as $p)
         <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen', ['prodi' => $p]) }}">{{ $p }}</a></li>
     @endforeach
 </ul>
@@ -126,7 +126,7 @@
                     <tr class="{{ $ta === $taTerakhir ? '' : 'text-muted' }}">
                         <td>{{ $loop->first ? $ta : '' }}</td><td>{{ $x->program_studi }}</td>
                         <td class="text-end">{{ $ta === $taTerakhir ? $nDosen : '·' }}</td>
-                        <td class="text-end">{{ $x->jumlah_mahasiswa }}</td>
+                        <td class="text-end" @if ($x->per_angkatan) title="{{ collect($x->per_angkatan)->map(fn ($n, $kode) => 'Angkatan ' . ($labelAngkatan[$x->program_studi][$kode] ?? $kode) . ': ' . $n)->join(PHP_EOL) }}" @endif>{{ $x->jumlah_mahasiswa }}@if ($x->sumber === 'api') <i class="bi bi-cloud-check text-success" title="Dari eUniversity (mahasiswa aktif)"></i>@endif</td>
                         <td class="text-end">@if ($ta === $taTerakhir && $nDosen) 1 : {{ round($x->jumlah_mahasiswa / $nDosen, 1) }} @endif</td>
                         <td class="text-end {{ $ta === $taTerakhir && $kurang > 0 ? 'text-danger fw-semibold' : '' }}">{{ $ta === $taTerakhir ? max(0, $kurang) : '' }}</td>
                     </tr>
@@ -141,8 +141,13 @@
                 @csrf
                 <div class="fw-semibold mb-1">Isi jumlah mahasiswa</div>
                 <div class="d-flex flex-wrap gap-2 align-items-end">
-                    <div><label class="form-label mb-0">TA</label><input name="tahun_ajaran" value="{{ $taTerakhir }}" class="form-control form-control-sm" style="width:100px" required></div>
-                    @foreach (\App\Models\Dosen::PRODI as $p)
+                    <div><label class="form-label mb-0">TA</label>
+                        @if ($periodeTa->isNotEmpty())
+                            <select name="tahun_ajaran" class="form-select form-select-sm" style="width:120px">@foreach ($periodeTa as $t)<option @selected($t === $taTerakhir)>{{ $t }}</option>@endforeach</select>
+                        @else
+                            <input name="tahun_ajaran" value="{{ $taTerakhir }}" class="form-control form-control-sm" style="width:100px" required>
+                        @endif</div>
+                    @foreach (\App\Models\Dosen::daftarProdi() as $p)
                         <div><label class="form-label mb-0">{{ $p }}</label><input name="mahasiswa[{{ $p }}]" type="number" min="0" class="form-control form-control-sm" style="width:110px"
                             value="{{ $rasio[$taTerakhir]?->firstWhere('program_studi', $p)?->jumlah_mahasiswa }}"></div>
                     @endforeach

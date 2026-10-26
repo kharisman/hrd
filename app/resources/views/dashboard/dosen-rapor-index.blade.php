@@ -9,7 +9,7 @@
 
 <ul class="nav nav-pills mb-3 small">
     <li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen.rapor.index') }}">Semua Prodi</a></li>
-    @foreach (\App\Models\Dosen::PRODI as $p)
+    @foreach (\App\Models\Dosen::daftarProdi() as $p)
         <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen.rapor.index', ['prodi' => $p]) }}">{{ $p }}</a></li>
     @endforeach
 </ul>

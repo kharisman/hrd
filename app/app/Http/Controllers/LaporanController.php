@@ -94,7 +94,7 @@ class LaporanController extends Controller
             ['Nama', 'NIDN', 'Prodi', 'Status', 'Aktif', 'Jabatan Fungsional', 'TMT Jabfung', 'Angka Kredit', 'Pendidikan', 'Serdos', 'NIP Pegawai'],
             $baris, [
                 ['aktif', 'Status', ['1' => 'Aktif', '0' => 'Nonaktif', 'semua' => 'Aktif & nonaktif'], $aktif],
-                ['prodi', 'Prodi', ['' => 'Semua prodi'] + array_combine(Dosen::PRODI, Dosen::PRODI), $r->prodi],
+                ['prodi', 'Prodi', ['' => 'Semua prodi'] + array_combine(Dosen::daftarProdi(), Dosen::daftarProdi()), $r->prodi],
                 ['jabfung', 'Jabatan', ['' => 'Semua jabatan'] + array_combine(Dosen::JENJANG, Dosen::JENJANG), $r->jabfung],
             ]);
     }

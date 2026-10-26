@@ -53,10 +53,21 @@ class Sinkron
             }
             // Pegawai yang sudah dihapus di eUniversity ikut dihapus di HRD (tautan atasan/dosen/akun dilepas)
             $hilang = Staff::whereNotNull('api_id')->whereNotIn('api_id', $staff->pluck('idStaff'))->pluck('id');
+            // Yang punya pengajuan (arsip surat) tidak dihapus, cukup dinonaktifkan (FK pengajuan.staff_id restrict)
+            $berarsip = \App\Models\Pengajuan::whereIn('staff_id', $hilang)->distinct()->pluck('staff_id');
+            Staff::whereIn('id', $berarsip)->update(['aktif' => false]);
+            $hilang = $hilang->diff($berarsip)->values();
             if ($hilang->isNotEmpty()) {
                 Staff::whereIn('atasan_id', $hilang)->update(['atasan_id' => null]);
                 Dosen::whereIn('staff_id', $hilang)->update(['staff_id' => null]);
                 Akun::whereIn('staff_id', $hilang)->update(['staff_id' => null]);
+                // Data per orang (DISC, kehadiran) pindah ke akun lain ber-NIP sama bila ada, supaya tidak ikut terhapus (FK cascade)
+                foreach (Staff::whereIn('id', $hilang)->whereNotNull('nip')->get() as $s) {
+                    if ($ganti = Staff::where('nip', $s->nip)->whereNotIn('id', $hilang)->orderByDesc('aktif')->orderBy('id')->value('id')) {
+                        \App\Models\Disc::where('staff_id', $s->id)->whereNotExists(fn ($q) => $q->from('disc as d2')->where('d2.staff_id', $ganti))->update(['staff_id' => $ganti]);
+                        \App\Models\Kehadiran::where('staff_id', $s->id)->update(['staff_id' => $ganti]);
+                    }
+                }
                 $stat['staff_dihapus'] = Staff::whereIn('id', $hilang)->delete();
             }
 

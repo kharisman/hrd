@@ -31,6 +31,9 @@
                 <tr><th>Jabatan Fungsional</th><td>{{ $d->jabatan_fungsional ?? 'Non JFA' }}{{ $d->angka_kredit ? " ({$d->angka_kredit})" : '' }}<br><small class="text-muted">TMT {{ $tgl($d->tmt_jabfung) }}</small></td></tr>
                 <tr><th>Jafung seharusnya</th><td>@if ($nilai->seharusnya !== null){{ $J::JAFUNG[$nilai->seharusnya] }} <span class="badge text-bg-{{ $nilai->tepat ? 'success' : 'warning' }}">{{ $nilai->tepat ? 'Tepat' : 'Tertinggal' }}</span>@else - @endif</td></tr>
                 <tr><th>Naik berikutnya</th><td>@if ($nilai->jenjang < 4){{ $J::JAFUNG[min($nilai->jenjang + 1, 4)] }} · {{ $nilai->layakNaik ? ($nilai->bisaNaik ? 'sudah bisa diajukan' : 'mulai ' . $nilai->layakNaik->translatedFormat('M Y')) : 'TMT jafung belum diisi' }}@endif</td></tr>
+                <tr><th>Bimbingan Akademik (PA)</th><td>{{ $d->jumlah_pa !== null ? $d->jumlah_pa . ' mahasiswa' : '-' }}
+                    @if ($pa && $pa['status'])<div class="text-muted">{{ collect($pa['status'])->map(fn ($n, $s) => "$s $n")->join(' · ') }}</div>@endif</td></tr>
+                <tr><th>Dosen Penguji</th><td>{!! $d->penguji ? '<span class="badge text-bg-success">Terdaftar</span>' : '<span class="text-muted">Belum terdaftar</span>' !!}</td></tr>
                 <tr><th>Sertifikasi Dosen</th><td>@if ($d->serdos)<span class="badge text-bg-success">Serdos</span>@elseif ($nilai->eligibleSerdos)<span class="badge text-bg-info">Eligible</span>@else<span class="badge text-bg-light">Belum</span>@endif</td></tr>
                 <tr><th>Pendidikan</th><td>
                     @forelse ($pendidikan->sortBy(fn ($p) => array_search($p->jenjang, \App\Models\RiwayatPendidikan::JENJANG)) as $p)
@@ -142,6 +145,46 @@
                 </div>
             </div>
         @endforeach
+
+        {{-- Bimbingan PKL / proposal / skripsi (eUniversity) --}}
+        <div class="card">
+            <div class="card-header d-flex justify-content-between"><span>Bimbingan PKL / Proposal / Skripsi <small class="text-muted">· eUniversity</small></span>
+                <small class="text-muted">@foreach (\App\Models\Bimbingan::JENIS as $j => $l){{ $l }} {{ $bimbingan->flatten()->where('jenis', $j)->count() }}{{ $loop->last ? '' : ' · ' }}@endforeach</small></div>
+            <div class="table-responsive" style="max-height:300px">
+            <table class="table table-sm small mb-0">
+                @forelse ($bimbingan as $periode => $daftar)
+                    <tr class="table-light"><th colspan="3">{{ $periode }} <span class="text-muted fw-normal">· {{ $daftar->countBy('jenis')->map(fn ($n, $j) => \App\Models\Bimbingan::JENIS[$j] . " $n")->join(', ') }}</span></th></tr>
+                    @foreach ($daftar as $b)
+                        <tr><td style="width:80px"><span class="badge text-bg-light">{{ \App\Models\Bimbingan::JENIS[$b->jenis] }}</span></td><td>{{ $b->judul ?? '-' }}</td><td class="text-muted text-nowrap">{{ $b->program_studi }}</td></tr>
+                    @endforeach
+                @empty
+                    <tr><td class="text-muted">Belum ada bimbingan PKL/skripsi di eUniversity.</td></tr>
+                @endforelse
+            </table>
+            </div>
+            @if ($pa && $pa['angkatan'])
+                <div class="card-footer small text-muted">Bimbingan PA per angkatan: {{ collect($pa['angkatan'])->map(fn ($n, $a) => "$a: $n")->join(' · ') }}</div>
+            @endif
+        </div>
+
+        {{-- Kelas yang diampu (eUniversity) --}}
+        <div class="card">
+            <div class="card-header">Mata Kuliah yang Diampu <small class="text-muted">· eUniversity</small></div>
+            <div class="table-responsive" style="max-height:300px">
+            <table class="table table-sm small mb-0">
+                @forelse ($diampu as $periode => $kelas)
+                    <tr class="table-light"><th colspan="3">{{ $periode }} <span class="text-muted fw-normal">· {{ $kelas->unique('kode_mk')->count() }} MK, {{ $kelas->unique('kode_mk')->sum('sks') }} SKS</span></th></tr>
+                    @foreach ($kelas->groupBy('kode_mk') as $k)
+                        <tr><td>{{ $k->first()->nama_mk }} <span class="text-muted">{{ $k->first()->kode_mk }}</span></td>
+                            <td class="text-muted">{{ $k->pluck('kelas')->join(', ') }}</td>
+                            <td class="text-end text-nowrap">{{ $k->first()->sks }} SKS · {{ $k->sum('jumlah_mhs') }} mhs</td></tr>
+                    @endforeach
+                @empty
+                    <tr><td class="text-muted">Belum ada data kelas di eUniversity.</td></tr>
+                @endforelse
+            </table>
+            </div>
+        </div>
 
         {{-- Penguasaan mata kuliah --}}
         <div class="card">

@@ -3,6 +3,17 @@
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ route('staff.index') }}" class="text-decoration-none">Data Pegawai</a></li>
     @if ($staff->exists)<li class="breadcrumb-item"><a href="{{ route('staff.show', $staff) }}" class="text-decoration-none">{{ $staff->nama }}</a></li>@endif
+@if (!empty($strukturMap) && count($strukturMap))
+<script>
+    // Level yang ditawarkan mengikuti struktur eUniversity untuk divisi terpilih
+    (() => {
+        const peta = @json($strukturMap), div = document.querySelector('[name=id_divisi]'), lev = document.querySelector('[name=id_level]');
+        const saring = () => [...lev.options].forEach(o => o.hidden = o.value && div.value && !(peta[div.value] || []).map(String).includes(o.value));
+        div.addEventListener('change', () => { saring(); if (lev.selectedOptions[0]?.hidden) lev.value = ''; });
+        saring();
+    })();
+</script>
+@endif
 @endsection
 
 @section('content')
@@ -20,7 +31,7 @@
                 @foreach ($divisiList as $id => $nama)<option value="{{ $id }}" @selected(old('id_divisi', $staff->id_divisi) == $id)>{{ $nama }}</option>@endforeach
             </select></div>
         <div class="col-md-4"><label class="form-label">Level / Jabatan *</label>
-            <select name="id_level" class="form-select" required><option value="">-</option>
+            <select name="id_level" class="form-select @error('id_level') is-invalid @enderror" required><option value="">-</option>
                 @foreach ($levelList as $id => $nama)<option value="{{ $id }}" @selected(old('id_level', $staff->id_level) == $id)>{{ $nama }}</option>@endforeach
             </select></div>
         <div class="col-12 form-text mt-1">Divisi + level menentukan role login eUniversity (mis. BAAK, Kaprodi).</div>

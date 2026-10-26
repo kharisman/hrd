@@ -141,6 +141,18 @@ class PctApi
         return $hasil;
     }
 
+    // Jumlah baris sesuai filter (meta.total), tanpa mengambil datanya
+    public function total(string $path, array $query = []): int
+    {
+        return (int) $this->cek($this->http($this->token(), 8, 3000)->get($path, $query + ['per_page' => 1]))->json('meta.total', 0);
+    }
+
+    // Satu objek (endpoint detail), isi "data"
+    public function detail(string $path): array
+    {
+        return (array) $this->cek($this->http($this->token(), 8, 3000)->get($path))->json('data');
+    }
+
     // Cek koneksi: jumlah total baris endpoint (1 permintaan kecil)
     public function ambilSatuHalaman(string $path): int
     {

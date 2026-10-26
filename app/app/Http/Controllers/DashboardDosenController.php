@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Angkatan;
 use App\Models\Dosen;
+use App\Models\PeriodeKrs;
+use App\Models\Prodi;
 use App\Models\Kompetensi;
+use App\Models\Mengajar;
+use App\Services\SinkronAkademik;
 use App\Models\MkInti;
 use App\Models\Pejabat;
 use App\Models\RasioProdi;
@@ -30,16 +35,19 @@ class DashboardDosenController extends Controller
 
     public function __invoke(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::PRODI) ? $r->prodi : null;
-        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Dosen::PRODI)->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
+        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : null;
+        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Dosen::daftarProdi())->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
         $dosen = $prodi ? $semua->where('prodi', $prodi)->values() : $semua;
 
         return view('dashboard.dosen', [
             'prodi' => $prodi,
             'dosen' => $dosen,
             'ringkas' => $this->ringkas($dosen),
-            'perProdi' => collect(Dosen::PRODI)->mapWithKeys(fn ($p) => [$p => $this->ringkas($semua->where('prodi', $p))]),
+            'perProdi' => collect(Dosen::daftarProdi())->mapWithKeys(fn ($p) => [$p => $this->ringkas($semua->where('prodi', $p))]),
             'rasio' => RasioProdi::orderBy('tahun_ajaran')->get()->groupBy('tahun_ajaran'),
+            'periodeTa' => PeriodeKrs::tahunAjaran(),
+            // Label angkatan per prodi: kode angkatan → tahun ajaran masuk
+            'labelAngkatan' => Prodi::where('jenjang', 'Strata Satu')->get()->mapWithKeys(fn ($p) => [$p->nama => Angkatan::where('prodi_api_id', $p->api_id)->pluck('periode', 'kode')]),
             'jumlahPerProdi' => $semua->countBy('prodi'),
             'bolehUbah' => $this->isAdmin(),
         ]);
@@ -49,14 +57,16 @@ class DashboardDosenController extends Controller
     public function simpanRasio(Request $r)
     {
         abort_unless($this->isAdmin(), 403);
+        $periode = PeriodeKrs::tahunAjaran();
         $d = $r->validate([
-            'tahun_ajaran' => ['required', 'regex:#^\d{4}/\d{4}$#'],
+            // Tahun ajaran dari periode KRS eUniversity (format bebas hanya bila periode belum disinkron)
+            'tahun_ajaran' => ['required', 'regex:#^\d{4}/\d{4}$#', $periode->isNotEmpty() ? Rule::in($periode) : 'string'],
             'mahasiswa' => 'required|array',
             'mahasiswa.*' => 'nullable|integer|min:0',
             'target' => 'required|integer|min:1|max:99',
         ], ['tahun_ajaran.regex' => 'Format tahun ajaran: 2026/2027.']);
         foreach ($d['mahasiswa'] as $p => $n) {
-            if (in_array($p, Dosen::PRODI) && $n !== null) {
+            if (in_array($p, Dosen::daftarProdi()) && $n !== null) {
                 RasioProdi::updateOrCreate(['program_studi' => $p, 'tahun_ajaran' => $d['tahun_ajaran']], ['jumlah_mahasiswa' => $n, 'target' => $d['target']]);
             }
         }
@@ -67,7 +77,7 @@ class DashboardDosenController extends Controller
 
     public function mk(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::PRODI) ? $r->prodi : Dosen::PRODI[0];
+        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : Dosen::daftarProdi()[0];
         $daftarKurikulum = $this->kurikulum($prodi);
         $kurikulum = $daftarKurikulum->contains($r->kurikulum) ? $r->kurikulum : $daftarKurikulum->first();
         $mk = MkInti::with('dosen:id')->where(['program_studi' => $prodi, 'kurikulum' => $kurikulum])->orderBy('urutan')->orderBy('id')->get();
@@ -76,14 +86,36 @@ class DashboardDosenController extends Controller
         $dosen = Dosen::where(fn ($q) => $q->where(['aktif' => true, 'program_studi' => $prodi])
             ->orWhereIn('id', $mk->flatMap->dosen->pluck('id')))->orderBy('nama')->get();
 
+        $this->hitungKuasai($mk);
+        $dosen = $dosen->merge(Dosen::whereIn('id', $mk->flatMap->kuasai)->whereNotIn('id', $dosen->pluck('id'))->get())->sortBy('nama')->values();
+        $pernah = fn ($m, $d) => in_array($d->id, $m->kuasai) && !$m->dosen->contains('id', $d->id);
+
+        // Mode ubah: daftar MK kurikulum API untuk menautkan manual MK yang namanya berbeda
+        $materiApi = $r->boolean('ubah') && $this->isAdmin() && ($idKur = $mk->pluck('id_kurikulum_api')->filter()->first())
+            ? rescue(fn () => collect(app(\App\Services\PctApi::class)->detail("/kurikulum/$idKur/detail")['semester'] ?? [])
+                ->flatMap(fn ($s) => $s['materi'])->sortBy('namaMateri')->mapWithKeys(fn ($m) => [$m['kodeMateri'] => "{$m['namaMateri']} ({$m['kodeMateri']}, {$m['sks']} SKS)"]), collect(), false)
+            : collect();
+
+        // Saran tautan untuk MK yang belum tertaut: nama MK eUniversity paling mirip (≥ 55%), dipilih admin sebelum disimpan
+        $saran = $mk->whereNull('kode_mk')->mapWithKeys(function ($m) use ($materiApi) {
+            $skor = $materiApi->map(function ($label, $kode) use ($m) {
+                similar_text(strtolower(preg_replace('/\(.*?\)/', '', $m->nama)), strtolower(preg_replace('/ \(.*$/', '', $label)), $p);
+                return $p;
+            })->sortDesc();
+            return [$m->id => $skor->first() >= 55 ? $skor->keys()->first() : null];
+        })->filter();
+
         return view('dashboard.dosen-mk', [
+            'pernah' => $pernah, 'materiApi' => $materiApi, 'saran' => $saran,
+            'dipakaiAngkatan' => ($idKur = $mk->pluck('id_kurikulum_api')->filter()->first())
+                ? Angkatan::where(['id_kurikulum_api' => $idKur, 'aktif' => true])->orderBy('periode')->pluck('periode') : collect(),
             'prodi' => $prodi, 'kurikulum' => $kurikulum, 'daftarKurikulum' => $daftarKurikulum,
             'mk' => $mk, 'dosen' => $dosen, 'singkat' => $this->namaSingkat($dosen),
             'ubah' => $r->boolean('ubah') && $this->isAdmin(), 'bolehUbah' => $this->isAdmin(),
             // Kekurangan dosen semua prodi pada kurikulum terbaru masing-masing (seperti sheet SUMMARY)
-            'kurangSemua' => collect(Dosen::PRODI)->mapWithKeys(fn ($p) => [$p => MkInti::with('dosen:id')
+            'kurangSemua' => collect(Dosen::daftarProdi())->mapWithKeys(fn ($p) => [$p => MkInti::with('dosen:id')
                 ->where(['program_studi' => $p, 'kurikulum' => $this->kurikulum($p)->first()])->orderBy('urutan')->get()
-                ->filter(fn ($m) => $m->gap < 0)]),
+                ->tap(fn ($c) => $this->hitungKuasai($c))->filter(fn ($m) => $m->gap < 0)]),
         ]);
     }
 
@@ -91,11 +123,12 @@ class DashboardDosenController extends Controller
     public function simpanMk(Request $r)
     {
         abort_unless($this->isAdmin(), 403);
-        $d = $r->validate(['prodi' => ['required', Rule::in(Dosen::PRODI)], 'kurikulum' => 'required|string|max:20',
-            'kuasai' => 'array', 'kebutuhan' => 'array', 'kebutuhan.*' => 'integer|min:0|max:20', 'solusi' => 'array', 'solusi.*' => 'nullable|string|max:255']);
+        $d = $r->validate(['prodi' => ['required', Rule::in(Dosen::daftarProdi())], 'kurikulum' => 'required|string|max:20',
+            'kuasai' => 'array', 'kebutuhan' => 'array', 'kebutuhan.*' => 'integer|min:0|max:20', 'solusi' => 'array', 'solusi.*' => 'nullable|string|max:255', 'kode' => 'array', 'kode.*' => 'nullable|string|max:20']);
         foreach (MkInti::where(['program_studi' => $d['prodi'], 'kurikulum' => $d['kurikulum']])->get() as $m) {
             $m->dosen()->sync(array_map('intval', array_keys($d['kuasai'][$m->id] ?? [])));
-            $m->update(['kebutuhan' => $d['kebutuhan'][$m->id] ?? $m->kebutuhan, 'solusi' => $d['solusi'][$m->id] ?? null]);
+            $m->update(['kebutuhan' => $d['kebutuhan'][$m->id] ?? $m->kebutuhan, 'solusi' => $d['solusi'][$m->id] ?? null]
+                + (array_key_exists($m->id, $d['kode'] ?? []) ? ['kode_mk' => $d['kode'][$m->id] ?: null] : []));
         }
         return redirect()->route('dashboard.dosen.mk', ['prodi' => $d['prodi'], 'kurikulum' => $d['kurikulum']])->with('ok', 'Penguasaan mata kuliah disimpan.');
     }
@@ -104,11 +137,23 @@ class DashboardDosenController extends Controller
     {
         abort_unless($this->isAdmin(), 403);
         $d = $r->validate([
-            'program_studi' => ['required', Rule::in(Dosen::PRODI)], 'kurikulum' => 'required|string|max:20',
-            'nama' => ['required', 'string', 'max:255', Rule::unique('mk_inti')->where(fn ($q) => $q->where(['program_studi' => $r->program_studi, 'kurikulum' => $r->kurikulum]))],
+            'program_studi' => ['required', Rule::in(Dosen::daftarProdi())], 'kurikulum' => 'required|string|max:20',
+            'kode_mk' => 'nullable|string|max:20',
+            'nama' => ['required_without:kode_mk', 'nullable', 'string', 'max:255', Rule::unique('mk_inti')->where(fn ($q) => $q->where(['program_studi' => $r->program_studi, 'kurikulum' => $r->kurikulum]))],
             'bidang_ilmu' => 'nullable|string|max:255', 'semester' => 'nullable|in:Ganjil,Genap', 'irisan' => 'nullable|string|max:255',
             'kebutuhan' => 'required|integer|min:0|max:20',
-        ], ['nama.unique' => 'Mata kuliah ini sudah ada di kurikulum tersebut.']);
+        ], ['nama.unique' => 'Mata kuliah ini sudah ada di kurikulum tersebut.', 'nama.required_without' => 'Pilih MK dari kurikulum eUniversity atau isi nama.']);
+        // Dipilih dari kurikulum eUniversity: nama, SKS, semester, kode ikut API
+        if ($d['kode_mk'] ?? null) {
+            $idKur = MkInti::where(['program_studi' => $d['program_studi'], 'kurikulum' => $d['kurikulum']])->value('id_kurikulum_api');
+            $m = $idKur ? collect(app(\App\Services\PctApi::class)->detail("/kurikulum/$idKur/detail")['semester'] ?? [])
+                ->flatMap(fn ($s) => collect($s['materi'])->map(fn ($x) => $x + ['smt' => $s['semester']]))->firstWhere('kodeMateri', $d['kode_mk']) : null;
+            abort_unless($m, 422, 'MK tidak ditemukan di kurikulum eUniversity.');
+            if (MkInti::where(['program_studi' => $d['program_studi'], 'kurikulum' => $d['kurikulum'], 'kode_mk' => $m['kodeMateri']])->exists()) {
+                return back()->withErrors('Mata kuliah ini sudah ada di matriks.');
+            }
+            $d = ['nama' => trim($m['namaMateri']), 'sks' => $m['sks'], 'semester' => $m['smt'] % 2 ? 'Ganjil' : 'Genap', 'id_kurikulum_api' => $idKur] + $d;
+        }
         MkInti::create($d + ['urutan' => (int) MkInti::where(['program_studi' => $d['program_studi'], 'kurikulum' => $d['kurikulum']])->max('urutan') + 1]);
         return redirect()->route('dashboard.dosen.mk', ['prodi' => $d['program_studi'], 'kurikulum' => $d['kurikulum'], 'ubah' => 1])->with('ok', "{$d['nama']} ditambahkan.");
     }
@@ -124,10 +169,10 @@ class DashboardDosenController extends Controller
 
     public function kompetensi(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::PRODI) ? $r->prodi : null;
+        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : null;
         $daftarTahun = Kompetensi::distinct()->orderByDesc('tahun')->pluck('tahun')->push(now()->year)->unique()->sortDesc()->values();
         $tahun = $daftarTahun->contains($r->integer('tahun')) ? $r->integer('tahun') : $daftarTahun->first();
-        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Dosen::PRODI)->orderBy('nama')->get();
+        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Dosen::daftarProdi())->orderBy('nama')->get();
         $skill = Kompetensi::whereIn('dosen_id', $dosen->pluck('id'))->where('tahun', $tahun)->get()->groupBy('dosen_id');
         $lalu = Kompetensi::whereIn('dosen_id', $dosen->pluck('id'))->where('tahun', $tahun - 1)->get()->groupBy('dosen_id');
         $rata = function ($c, $k, $kol = 'sekarang') {
@@ -174,11 +219,31 @@ class DashboardDosenController extends Controller
         return redirect()->route('dashboard.dosen.kompetensi', ['prodi' => $dosen->program_studi, 'tahun' => $d['tahun']])->with('ok', "Kompetensi {$dosen->nama} {$d['tahun']} disimpan.");
     }
 
+    /**
+     * Data eUniversity diutamakan: dosen aktif yang pernah mengampu MK (6 periode terakhir) dihitung menguasai,
+     * ditambah centang manual HRD. Cocok lewat kode MK, atau nama yang dinormalkan.
+     */
+    private function hitungKuasai($mk): void
+    {
+        $dosenApi = Dosen::where('aktif', true)->whereNotNull('api_id')->pluck('id', 'api_id');
+        $ajar = Mengajar::whereIn('dosen_api_id', $dosenApi->keys())->get(['dosen_api_id', 'kode_mk', 'nama_mk']);
+        $perKode = $ajar->groupBy('kode_mk')->map->pluck('dosen_api_id');
+        $perNama = $ajar->groupBy(fn ($a) => SinkronAkademik::kunci($a->nama_mk))->map->pluck('dosen_api_id');
+        foreach ($mk as $m) {
+            $api = collect($m->kode_mk ? $perKode[$m->kode_mk] ?? [] : [])->merge($perNama[SinkronAkademik::kunci($m->nama)] ?? []);
+            $m->kuasai = $m->dosen->pluck('id')->merge($api->map(fn ($id) => $dosenApi[$id]))->unique()->values()->all();
+        }
+    }
+
     // Kurikulum prodi, terbaru dulu: tahun (2026, 2021, ...) sebelum label lain seperti "Lama"
     private function kurikulum(string $prodi)
     {
-        return MkInti::where('program_studi', $prodi)->distinct()->pluck('kurikulum')
-            ->sortBy(fn ($k) => is_numeric($k) ? -$k : PHP_INT_MAX)->values();
+        // Urut menurut angkatan termuda yang memakainya (eUniversity), lalu tahun di kode kurikulum (OBE-SI-2026)
+        $grup = MkInti::where('program_studi', $prodi)->select('kurikulum', 'id_kurikulum_api')->distinct()->get();
+        $termuda = Angkatan::whereIn('id_kurikulum_api', $grup->pluck('id_kurikulum_api')->filter())->groupBy('id_kurikulum_api')
+            ->selectRaw('id_kurikulum_api, max(periode) p')->pluck('p', 'id_kurikulum_api');
+        return $grup->sortByDesc(fn ($g) => ($termuda[$g->id_kurikulum_api] ?? '0000') . (preg_match('/(\d{4})$/', $g->kurikulum, $t) ? $t[1] : '0000'))
+            ->pluck('kurikulum')->unique()->values();
     }
 
     // "Dini", "Eka H", "Eka P": nama depan, ditambah inisial bila ada nama depan kembar
