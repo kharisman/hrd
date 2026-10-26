@@ -12,10 +12,11 @@ class Pengajuan extends Model
     protected $table = 'pengajuan';
     protected $guarded = ['id'];
     protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'atasan_at' => 'datetime', 'hrd_at' => 'datetime',
-        'disetujui_at' => 'datetime', 'penandatangan' => 'array'];
+        'disetujui_at' => 'datetime', 'penandatangan' => 'array', 'tgl_mulai' => 'date', 'tgl_selesai' => 'date'];
 
     const MENUNGGU_ATASAN = 'Menunggu Atasan';
     const MENUNGGU_HRD = 'Menunggu HRD';
+    const MENUNGGU = [self::MENUNGGU_ATASAN, self::MENUNGGU_HRD];
     const STATUS = [self::MENUNGGU_ATASAN, self::MENUNGGU_HRD, 'Disetujui', 'Ditolak', 'Dibatalkan'];
     const WARNA = ['Menunggu Atasan' => 'warning', 'Menunggu HRD' => 'info', 'Disetujui' => 'success', 'Ditolak' => 'danger', 'Dibatalkan' => 'secondary'];
 
@@ -27,6 +28,22 @@ class Pengajuan extends Model
     public function staff()
     {
         return $this->belongsTo(Staff::class);
+    }
+
+    // Khusus jenis Cuti & Izin
+    public function jenisCuti()
+    {
+        return $this->belongsTo(JenisCuti::class);
+    }
+
+    public function scopeCuti($q)
+    {
+        return $q->whereNotNull('jenis_cuti_id');
+    }
+
+    public function getHariAttribute(): ?int
+    {
+        return $this->tgl_mulai ? $this->tgl_mulai->diffInDays($this->tgl_selesai) + 1 : null;
     }
 
     // Nama yang boleh ditampilkan: anonim disembunyikan dari selain pengaju sendiri

@@ -2,7 +2,7 @@
 @section('title', 'Dashboard')
 
 @section('actions')
-    <a href="{{ route('cuti.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>
+    <a href="{{ route('pengajuan.create', ['jenis' => $jenisCuti]) }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>
 @endsection
 
 @section('content')
@@ -25,15 +25,8 @@
 
 @if ($pengajuanBawahan)
 <div class="alert alert-warning d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan bawahan (dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>
+    <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan bawahan (cuti, dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>
     <a href="{{ route('pengajuan.index', ['tab' => 'atasan']) }}" class="btn btn-sm btn-warning">Proses</a>
-</div>
-@endif
-
-@if ($cutiBawahan->isNotEmpty())
-<div class="alert alert-warning d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-bell me-1"></i> <strong>{{ $cutiBawahan->count() }}</strong> pengajuan cuti bawahan menunggu persetujuan Anda.</span>
-    <a href="{{ route('cuti.index', ['status' => 'Menunggu']) }}" class="btn btn-sm btn-warning">Proses</a>
 </div>
 @endif
 
@@ -62,16 +55,16 @@
     </div>
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header d-flex justify-content-between"><span>Cuti Saya</span><a href="{{ route('cuti.index') }}" class="small text-decoration-none">Semua</a></div>
+            <div class="card-header d-flex justify-content-between"><span>Cuti Saya</span><a href="{{ route('pengajuan.index') }}" class="small text-decoration-none">Semua</a></div>
             <div class="list-group list-group-flush">
                 @forelse ($cutiSaya as $c)
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ route('pengajuan.show', $c) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                         <div>
                             <div>{{ $c->jenisCuti->nama }} <small class="text-muted">· {{ $c->hari }} hari</small></div>
                             <small class="text-muted">{{ $c->tgl_mulai->translatedFormat('d M') }} – {{ $c->tgl_selesai->translatedFormat('d M Y') }}</small>
                         </div>
-                        <span class="badge text-bg-{{ ['Menunggu' => 'warning', 'Disetujui' => 'success', 'Ditolak' => 'danger'][$c->status] }}">{{ $c->status }}</span>
-                    </div>
+                        <span class="badge text-bg-{{ \App\Models\Pengajuan::WARNA[$c->status] }}">{{ $c->status }}</span>
+                    </a>
                 @empty
                     <div class="list-group-item text-muted small">Belum ada pengajuan cuti.</div>
                 @endforelse

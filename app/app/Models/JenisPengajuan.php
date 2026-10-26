@@ -16,6 +16,11 @@ class JenisPengajuan extends Model
         'number' => 'Angka', 'rupiah' => 'Rupiah', 'select' => 'Pilihan', 'file' => 'Berkas'];
     const KATEGORI = ['Kehadiran & Waktu Kerja', 'Data & Dokumen', 'Pengembangan Karier', 'Keuangan & Kesejahteraan', 'Hubungan Kerja', 'Lainnya'];
 
+    public function isCuti(): bool
+    {
+        return $this->kode === 'cuti';
+    }
+
     public function pengajuan()
     {
         return $this->hasMany(Pengajuan::class);

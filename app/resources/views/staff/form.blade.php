@@ -33,7 +33,7 @@
                 @foreach ($atasanList as $a)<option value="{{ $a->id }}" @selected(old('atasan_id', $staff->atasan_id) == $a->id)>{{ $a->nama }} — {{ $a->level }}, {{ $a->divisi }}</option>@endforeach
             </select>
             @error('atasan_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-            <div class="form-text">Atasan yang menyetujui cuti pegawai ini.</div></div>
+            <div class="form-text">Atasan yang menyetujui cuti &amp; pengajuan pegawai ini.</div></div>
         <div class="col-md-3"><label class="form-label">Status Kepegawaian</label>
             <select name="status_kepegawaian" class="form-select"><option value="">-</option>
                 @foreach (\App\Models\Staff::STATUS as $o)<option @selected(old('status_kepegawaian', $staff->status_kepegawaian) == $o)>{{ $o }}</option>@endforeach

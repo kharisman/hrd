@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CutiController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DosenController;
 use App\Http\Controllers\JenisCutiController;
@@ -40,8 +39,6 @@ Route::middleware('auth')->group(function () {
     Route::get('riwayat/template', [RiwayatController::class, 'template'])->name('riwayat.template');
     Route::get('riwayat/{riwayat}/berkas', [RiwayatController::class, 'berkas'])->name('riwayat.berkas');
     Route::resource('riwayat', RiwayatController::class)->except('show');
-    Route::resource('cuti', CutiController::class)->only('index', 'create', 'store')->parameters(['cuti' => 'cuti']);
-    Route::resource('jenis-cuti', JenisCutiController::class)->only('index', 'store', 'update');
     Route::prefix('laporan')->name('laporan.')->controller(LaporanController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('cuti', 'cuti')->name('cuti');
@@ -65,7 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::post('pengajuan/{pengajuan}/batal', [PengajuanController::class, 'batal'])->name('pengajuan.batal');
     Route::get('pengajuan/{pengajuan}/pdf', [PengajuanController::class, 'pdf'])->name('pengajuan.pdf');
     Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');
+    Route::resource('jenis-cuti', JenisCutiController::class)->only('index', 'store', 'update');
     Route::resource('jenis-pengajuan', JenisPengajuanController::class)->except('show', 'destroy');
 
-    Route::post('cuti/{cuti}/proses', [CutiController::class, 'proses'])->name('cuti.proses');
 });

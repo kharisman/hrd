@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\JenisCuti;
 use App\Models\JenisPengajuan;
 use App\Models\Pengajuan;
 use App\Models\Pengaturan;
 use App\Models\Staff;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 // Pengajuan umum (dinas luar, surat keterangan, reimburse, dll.). Isian & alur diatur per jenis.
 class PengajuanController extends Controller
@@ -55,6 +58,7 @@ class PengajuanController extends Controller
             'jenis' => $jenis,
             'daftar' => JenisPengajuan::where('aktif', true)->orderBy('urutan')->get()->groupBy('kategori'),
             'staff' => Staff::with('atasan')->find($this->myStaffId()),
+            'rekap' => $jenis?->isCuti() ? JenisCuti::rekap($this->myStaffIds()->all()) : null,
         ]);
     }
 
@@ -75,6 +79,8 @@ class PengajuanController extends Controller
         }
         $label = collect($jenis->isian)->mapWithKeys(fn ($f) => ["isian.{$f['key']}" => $f['label']])->all();
         $r->validate($aturan, [], $label);
+        // Sebelum berkas disimpan, supaya gagal jatah tidak meninggalkan berkas yatim
+        $cuti = $jenis->isCuti() ? $this->validasiCuti($r, $staff) : [];
 
         $data = [];
         foreach ($jenis->isian as $f) {
@@ -87,17 +93,35 @@ class PengajuanController extends Controller
         }
 
         $anonim = $jenis->boleh_anonim && $r->boolean('anonim');
-        $p = Pengajuan::create([
+        $p = Pengajuan::create($cuti + [
             'jenis_pengajuan_id' => $jenis->id, 'staff_id' => $staff->id, 'anonim' => $anonim,
             'data' => $data, 'status' => Pengajuan::statusAwal($jenis, $staff, $anonim),
         ]);
         return redirect()->route('pengajuan.show', $p)->with('ok', "Pengajuan {$jenis->nama} dikirim ({$p->status}).");
     }
 
+    // Cuti: jenis & tanggal + cek jatah tahun kalender tgl_mulai (jenis tanpa kuota, mis. Izin, tidak dibatasi)
+    private function validasiCuti(Request $r, Staff $staff): array
+    {
+        $d = $r->validate([
+            'jenis_cuti_id' => ['required', Rule::exists('jenis_cuti', 'id')->where('aktif', true)],
+            'tgl_mulai' => 'required|date',
+            'tgl_selesai' => 'required|date|after_or_equal:tgl_mulai',
+        ], [], ['jenis_cuti_id' => 'jenis cuti', 'tgl_mulai' => 'tanggal mulai', 'tgl_selesai' => 'tanggal selesai']);
+
+        $tahun = Carbon::parse($d['tgl_mulai'])->year;
+        $jatah = JenisCuti::rekap($this->myStaffIds()->all(), $tahun)[$d['jenis_cuti_id']];
+        $hari = Carbon::parse($d['tgl_mulai'])->diffInDays($d['tgl_selesai']) + 1;
+        if ($jatah->sisa !== null && $hari > $jatah->sisa) {
+            throw ValidationException::withMessages(['tgl_selesai' => "Melebihi jatah {$jatah->jenis->nama} {$tahun}: diajukan {$hari} hari, sisa {$jatah->sisa} dari {$jatah->kuota} hari."]);
+        }
+        return $d;
+    }
+
     public function show(Pengajuan $pengajuan)
     {
         abort_unless($this->bolehLihat($pengajuan), 403);
-        $pengajuan->load('jenis', 'staff.atasan');
+        $pengajuan->load('jenis', 'jenisCuti', 'staff.atasan');
         return view('pengajuan.show', ['p' => $pengajuan, 'me' => $this->myStaffId(), 'tahap' => $this->tahapProses($pengajuan)]);
     }
 
@@ -134,7 +158,7 @@ class PengajuanController extends Controller
     public function pdf(Pengajuan $pengajuan)
     {
         abort_unless($this->bolehLihat($pengajuan), 403);
-        $pengajuan->load('jenis', 'staff');
+        $pengajuan->load('jenis', 'jenisCuti', 'staff');
 
         $qr = $pengajuan->kode_validasi
             ? base64_encode(\Endroid\QrCode\Builder\Builder::create()
@@ -187,8 +211,9 @@ class PengajuanController extends Controller
         if ($p->status === Pengajuan::MENUNGGU_ATASAN && $this->atasannya($p)) {
             return 'atasan';
         }
-        // HRD boleh memutus di tahap mana pun yang masih berjalan (mis. atasan tidak aktif), kecuali pengajuannya sendiri
-        if ($this->isAdmin() && !$p->selesai() && !$this->myStaffIds()->contains($p->staff_id)) {
+        // Alur wajib urut: HRD baru memproses setelah atasan. Atasan tidak aktif → HRD ganti atasan di Atasan & Bawahan.
+        // Pengajuan sendiri tidak boleh diproses sendiri (admin juga pegawai).
+        if ($this->isAdmin() && $p->status === Pengajuan::MENUNGGU_HRD && !$this->myStaffIds()->contains($p->staff_id)) {
             return 'hrd';
         }
         return null;

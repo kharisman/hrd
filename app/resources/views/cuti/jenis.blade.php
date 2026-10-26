@@ -23,7 +23,7 @@
             <td><div class="input-group input-group-sm"><input form="j{{ $j->id }}" type="number" min="1" name="kuota" value="{{ $j->kuota }}" class="form-control" placeholder="∞"><span class="input-group-text">hari</span></div></td>
             <td><input form="j{{ $j->id }}" name="keterangan" value="{{ $j->keterangan }}" class="form-control form-control-sm"></td>
             <td class="text-center"><input form="j{{ $j->id }}" type="checkbox" name="aktif" value="1" class="form-check-input" @checked($j->aktif)></td>
-            <td class="text-end text-muted small">{{ $j->cuti_count }} cuti</td>
+            <td class="text-end text-muted small">{{ $j->pengajuan_count }} pengajuan</td>
             <td class="text-end">
                 <form id="j{{ $j->id }}" method="post" action="{{ route('jenis-cuti.update', $j) }}">@csrf @method('put')
                     <button class="btn btn-sm btn-outline-primary">Simpan</button>

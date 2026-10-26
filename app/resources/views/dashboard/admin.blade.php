@@ -47,12 +47,12 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between"><span><i class="bi bi-hourglass-split me-1"></i> Cuti Menunggu</span>
-                <a href="{{ route('cuti.index', ['status' => 'Menunggu']) }}" class="small text-decoration-none">Semua</a></div>
+                <a href="{{ $semuaCutiMenunggu }}" class="small text-decoration-none">Semua</a></div>
             <div class="list-group list-group-flush">
                 @forelse ($cutiMenunggu as $c)
-                    <a href="{{ route('cuti.index', ['status' => 'Menunggu']) }}" class="list-group-item list-group-item-action">
+                    <a href="{{ route('pengajuan.show', $c) }}" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between"><strong class="text-truncate">{{ $c->staff->nama ?? '-' }}</strong><small class="text-muted text-nowrap ms-2">{{ $c->hari }} hari</small></div>
-                        <small class="text-muted">{{ $c->jenisCuti->nama }} · {{ $c->tgl_mulai->translatedFormat('d M') }} – {{ $c->tgl_selesai->translatedFormat('d M Y') }}</small>
+                        <small class="text-muted">{{ $c->jenisCuti->nama }} · {{ $c->tgl_mulai->translatedFormat('d M') }} – {{ $c->tgl_selesai->translatedFormat('d M Y') }} · {{ $c->status }}</small>
                     </a>
                 @empty
                     <div class="list-group-item text-muted small"><i class="bi bi-check-circle text-success me-1"></i>Tidak ada cuti yang menunggu.</div>

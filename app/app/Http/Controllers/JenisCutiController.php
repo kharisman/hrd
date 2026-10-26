@@ -20,7 +20,7 @@ class JenisCutiController extends Controller
 
     public function index()
     {
-        return view('cuti.jenis', ['jenis' => JenisCuti::withCount('cuti')->orderBy('id')->get()]);
+        return view('cuti.jenis', ['jenis' => JenisCuti::withCount('pengajuan')->orderBy('id')->get()]);
     }
 
     public function store(Request $request)

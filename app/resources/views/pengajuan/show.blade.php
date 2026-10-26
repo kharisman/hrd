@@ -27,6 +27,10 @@
                 <tr><th style="width:35%">Pengaju</th><td>{{ $p->namaPengaju($me) }}
                     @unless ($p->anonim && $p->staff_id !== $me)<br><small class="text-muted">{{ $p->staff->level ?? '' }} · {{ $p->staff->divisi ?? '' }}</small>@endunless</td></tr>
                 <tr><th>Diajukan</th><td>{{ $p->created_at->translatedFormat('d F Y H:i') }}</td></tr>
+                @if ($p->jenis_cuti_id)
+                    <tr><th>Jenis Cuti</th><td>{{ $p->jenisCuti->nama }}</td></tr>
+                    <tr><th>Tanggal</th><td>{{ $p->tgl_mulai->translatedFormat('d M Y') }} – {{ $p->tgl_selesai->translatedFormat('d M Y') }} <span class="text-muted">({{ $p->hari }} hari)</span></td></tr>
+                @endif
                 @foreach ($p->jenis->isian as $f)
                     @php($v = $p->data[$f['key']] ?? null)
                     <tr><th>{{ $f['label'] }}</th><td>
@@ -78,9 +82,6 @@
             <form method="post" action="{{ route('pengajuan.proses', $p) }}" class="card"><div class="card-body">
                 @csrf
                 <h6>Proses sebagai {{ $tahap === 'atasan' ? 'Atasan' : 'HRD' }}</h6>
-                @if ($tahap === 'hrd' && $p->status === \App\Models\Pengajuan::MENUNGGU_ATASAN)
-                    <div class="small text-warning mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Atasan belum memproses. Keputusan HRD langsung menjadi keputusan akhir.</div>
-                @endif
                 <textarea name="catatan" rows="2" class="form-control mb-2" placeholder="Catatan (opsional)"></textarea>
                 <div class="d-flex gap-2">
                     <button name="keputusan" value="setujui" class="btn btn-success flex-fill"><i class="bi bi-check-lg me-1"></i>Setujui</button>

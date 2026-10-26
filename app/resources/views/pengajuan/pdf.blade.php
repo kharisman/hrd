@@ -65,6 +65,10 @@
 
     <div class="bagian">Rincian pengajuan:</div>
     <table class="data">
+        @if ($p->jenis_cuti_id)
+            <tr><td class="l">Jenis Cuti</td><td class="t">:</td><td>{{ $p->jenisCuti->nama }}</td></tr>
+            <tr><td class="l">Tanggal</td><td class="t">:</td><td>{{ $p->tgl_mulai->translatedFormat('d F Y') }} s.d. {{ $p->tgl_selesai->translatedFormat('d F Y') }} ({{ $p->hari }} hari)</td></tr>
+        @endif
         @foreach ($p->jenis->isian as $f)
             @php($v = $p->data[$f['key']] ?? null)
             <tr><td class="l">{{ $f['label'] }}</td><td class="t">:</td><td>

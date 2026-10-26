@@ -33,6 +33,22 @@
         @if ($jenis->keterangan)<p class="text-muted">{{ $jenis->keterangan }}</p>@endif
 
         <div class="row g-3">
+            @if ($jenis->isCuti())
+                <div class="col-12"><label class="form-label">Jenis Cuti *</label>
+                    <select name="jenis_cuti_id" class="form-select @error('jenis_cuti_id') is-invalid @enderror" required>
+                        <option value="">-</option>
+                        @foreach ($rekap as $r)
+                            <option value="{{ $r->jenis->id }}" @selected(old('jenis_cuti_id') == $r->jenis->id) @disabled($r->sisa === 0)>
+                                {{ $r->jenis->nama }}{{ $r->sisa !== null ? " — sisa {$r->sisa} hari" : '' }}</option>
+                        @endforeach
+                    </select>
+                    @error('jenis_cuti_id')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                <div class="col-md-6"><label class="form-label">Mulai *</label>
+                    <input type="date" name="tgl_mulai" value="{{ old('tgl_mulai') }}" class="form-control @error('tgl_mulai') is-invalid @enderror" required></div>
+                <div class="col-md-6"><label class="form-label">Selesai *</label>
+                    <input type="date" name="tgl_selesai" value="{{ old('tgl_selesai') }}" class="form-control @error('tgl_selesai') is-invalid @enderror" required>
+                    @error('tgl_selesai')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+            @endif
             @foreach ($jenis->isian as $f)
                 @php($nama = "isian[{$f['key']}]")
                 @php($err = "isian.{$f['key']}")
@@ -85,5 +101,23 @@
             <a href="{{ route('pengajuan.create') }}" class="btn btn-outline-secondary">Kembali</a>
         </div>
     </div></form>
+
+    @if ($jenis->isCuti())
+        <div class="card mt-3" style="max-width:820px">
+            <div class="card-header">Jatah Cuti {{ now()->year }}</div>
+            <table class="table mb-0">
+                <thead><tr><th>Jenis</th><th class="text-end">Jatah</th><th class="text-end">Terpakai</th><th class="text-end">Sisa</th></tr></thead>
+                @foreach ($rekap as $r)
+                    <tr>
+                        <td>{{ $r->jenis->nama }}@if ($r->jenis->keterangan)<br><small class="text-muted">{{ $r->jenis->keterangan }}</small>@endif</td>
+                        <td class="text-end">{{ $r->kuota ?? '—' }}</td>
+                        <td class="text-end">{{ $r->terpakai }}</td>
+                        <td class="text-end fw-semibold {{ $r->sisa === 0 ? 'text-danger' : '' }}">{{ $r->sisa ?? '∞' }}</td>
+                    </tr>
+                @endforeach
+            </table>
+            <div class="card-footer small text-muted">Jatah berlaku per tahun kalender dan tidak diakumulasi. Terpakai = disetujui + masih menunggu.</div>
+        </div>
+    @endif
 @endif
 @endsection

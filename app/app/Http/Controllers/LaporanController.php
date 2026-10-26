@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cuti;
 use App\Models\Dosen;
 use App\Models\JenisCuti;
+use App\Models\Pengajuan;
 use App\Models\RiwayatPendidikan;
 use App\Models\Staff;
 use App\Support\Menu;
@@ -33,7 +33,8 @@ class LaporanController extends Controller
     {
         $tahun = $r->integer('tahun') ?: now()->year;
         $jenis = JenisCuti::orderBy('id')->get();
-        $hari = Cuti::where('status', $r->input('status', 'Disetujui'))->whereYear('tgl_mulai', $tahun)
+        $status = $r->input('status', 'Disetujui');
+        $hari = Pengajuan::cuti()->whereIn('status', $status === 'Menunggu' ? Pengajuan::MENUNGGU : [$status])->whereYear('tgl_mulai', $tahun)
             ->selectRaw('staff_id, jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari, COUNT(*) n')
             ->groupBy('staff_id', 'jenis_cuti_id')->toBase()->get()->groupBy('staff_id');
 

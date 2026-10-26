@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cuti;
 use App\Models\Dosen;
 use App\Models\JenisCuti;
+use App\Models\JenisPengajuan;
+use App\Models\Pengajuan;
 use App\Models\RiwayatPendidikan;
 use App\Models\Staff;
 
@@ -18,6 +19,8 @@ class DashboardController extends Controller
     private function admin()
     {
         $hariIni = now()->toDateString();
+        $cutiMenunggu = Pengajuan::cuti()->whereIn('status', Pengajuan::MENUNGGU);
+        $daftarCuti = fn ($status = null) => route('pengajuan.index', ['tab' => 'semua', 'jenis' => JenisPengajuan::where('kode', 'cuti')->value('id'), 'status' => $status]);
         $dosenAktif = Dosen::where('aktif', true);
         $terakhirSinkron = max(Staff::max('disinkron_at'), Dosen::max('disinkron_at'));
 
@@ -29,20 +32,20 @@ class DashboardController extends Controller
             'kartu' => [
                 ['Pegawai aktif', Staff::aktif()->count(), 'people', route('staff.index'), 'dari ' . Staff::count() . ' akun staff'],
                 ['Dosen aktif', (clone $dosenAktif)->count(), 'mortarboard', route('dosen.index'), 'dari ' . Dosen::count() . ' dosen terdaftar'],
-                ['Cuti menunggu', Cuti::where('status', 'Menunggu')->count(), 'hourglass-split', route('cuti.index', ['status' => 'Menunggu']), 'perlu persetujuan'],
-                ['Sedang cuti', Cuti::where('status', 'Disetujui')->whereDate('tgl_mulai', '<=', $hariIni)->whereDate('tgl_selesai', '>=', $hariIni)->count(), 'calendar-x', route('cuti.index', ['status' => 'Disetujui']), 'hari ini'],
+                ['Cuti menunggu', (clone $cutiMenunggu)->count(), 'hourglass-split', $daftarCuti(), 'atasan / HRD'],
+                ['Sedang cuti', Pengajuan::cuti()->where('status', 'Disetujui')->whereDate('tgl_mulai', '<=', $hariIni)->whereDate('tgl_selesai', '>=', $hariIni)->count(), 'calendar-x', $daftarCuti('Disetujui'), 'hari ini'],
                 ['Studi lanjut', RiwayatPendidikan::where('status', 'Sedang Studi Lanjut')->count(), 'journal-bookmark', route('riwayat.index'), 'sedang berjalan'],
             ],
             'tindakan' => [
-                ['Cuti menunggu persetujuan', Cuti::where('status', 'Menunggu')->count(), route('cuti.index', ['status' => 'Menunggu'])],
-                ['Pengajuan menunggu HRD', \App\Models\Pengajuan::where('status', \App\Models\Pengajuan::MENUNGGU_HRD)->count(), route('pengajuan.index', ['tab' => 'semua', 'status' => \App\Models\Pengajuan::MENUNGGU_HRD])],
+                ['Pengajuan (termasuk cuti) menunggu HRD', Pengajuan::where('status', Pengajuan::MENUNGGU_HRD)->count(), route('pengajuan.index', ['tab' => 'semua', 'status' => Pengajuan::MENUNGGU_HRD])],
                 ['Pegawai aktif belum punya atasan', Staff::aktif()->whereNull('atasan_id')->count(), route('staff.atasan')],
                 ['Dosen aktif tanpa jabatan fungsional', (clone $dosenAktif)->whereNull('jabatan_fungsional')->count(), route('dosen.index')],
                 ['Studi lanjut lewat target lulus', RiwayatPendidikan::where('status', 'Sedang Studi Lanjut')->where('tahun_lulus', '<', now()->year)->count(), route('riwayat.index')],
             ],
             'terakhirSinkron' => $terakhirSinkron ? \Illuminate\Support\Carbon::parse($terakhirSinkron) : null,
-            'cutiMenunggu' => Cuti::with('staff', 'jenisCuti')->where('status', 'Menunggu')->orderBy('tgl_mulai')->limit(6)->get(),
-            'akanCuti' => Cuti::with('staff', 'jenisCuti')->where('status', 'Disetujui')
+            'cutiMenunggu' => (clone $cutiMenunggu)->with('staff', 'jenisCuti')->orderBy('tgl_mulai')->limit(6)->get(),
+            'semuaCutiMenunggu' => $daftarCuti(),
+            'akanCuti' => Pengajuan::cuti()->with('staff', 'jenisCuti')->where('status', 'Disetujui')
                 ->whereDate('tgl_selesai', '>=', $hariIni)->whereDate('tgl_mulai', '<=', now()->addDays(7))
                 ->orderBy('tgl_mulai')->limit(8)->get(),
             'perDivisi' => $hitung(Staff::aktif(), 'divisi', 'Tanpa divisi'),
@@ -61,10 +64,10 @@ class DashboardController extends Controller
         return view('dashboard.pegawai', [
             'akun' => $akun,
             'staff' => $staff,
-            'jatah' => $me ? JenisCuti::rekap($me) : collect(),
-            'cutiSaya' => $me ? Cuti::with('jenisCuti')->where('staff_id', $me)->latest()->limit(5)->get() : collect(),
-            'cutiBawahan' => Cuti::with('staff', 'jenisCuti')->whereIn('staff_id', $bawahan)->where('status', 'Menunggu')->orderBy('tgl_mulai')->get(),
-            'pengajuanBawahan' => \App\Models\Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', \App\Models\Pengajuan::MENUNGGU_ATASAN)->count(),
+            'jatah' => $me ? JenisCuti::rekap($this->myStaffIds()->all()) : collect(),
+            'cutiSaya' => Pengajuan::cuti()->with('jenisCuti')->whereIn('staff_id', $this->myStaffIds())->latest()->limit(5)->get(),
+            'pengajuanBawahan' => Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', Pengajuan::MENUNGGU_ATASAN)->count(),
+            'jenisCuti' => JenisPengajuan::where('kode', 'cuti')->value('id'),
             'jumlahBawahan' => $bawahan->count(),
         ]);
     }
