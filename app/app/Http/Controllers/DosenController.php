@@ -49,17 +49,6 @@ class DosenController extends Controller
             . "({$s['dosen_baru']} dosen baru, {$s['dosen_diperbarui']} diperbarui, {$s['dosen_tertaut_pegawai']} tertaut pegawai).");
     }
 
-    // Chat ID Telegram untuk login OTP (isian HRD, tidak dikirim ke eUniversity)
-    public function telegram(Request $request, Dosen $dosen)
-    {
-        $chat = $request->validate(['telegram' => 'nullable|regex:/^-?\d{5,20}$/'], ['telegram.regex' => 'Chat ID Telegram berupa angka.'])['telegram'];
-        $dosen->update(['telegram' => $chat]);
-        if ($dosen->staff_id) {
-            Staff::whereKey($dosen->staff_id)->update(['telegram' => $chat]);
-        }
-        return back()->with('ok', $chat ? 'Chat ID Telegram disimpan.' : 'Chat ID Telegram dihapus.');
-    }
-
     public function show(Dosen $dosen)
     {
         $dosen->load('staff');

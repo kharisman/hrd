@@ -83,11 +83,11 @@ Terima kasih. Kami siap menguji ulang setelah ada perbaikan.
 
 | # | Temuan | Status | Tindakan HRD |
 |---|---|---|---|
-| 1 | Hapus dosen masih bisa login | ✅ Diperbaiki di kode API, **belum deploy** | Setelah deploy: hapus `test_hrd_hapus` lewat `DELETE /v1/api-users/{id}` (admin), lalu uji ulang |
-| 2 | NIDN `-` duplikat | ✅ Diperbaiki, **belum deploy** | HRD sudah mengirim `-` untuk NIDN kosong. Uji ulang setelah deploy |
+| 1 | Hapus dosen masih bisa login | ✅ **Lolos uji ulang 26/10** | Login & token dicabut setelah hapus. `test_hrd_hapus` belum terhapus |
+| 2 | NIDN `-` duplikat | ✅ **Lolos uji ulang 26/10** | NIDN `-` & kosong diterima |
 | 3 | 403 tanpa User-Agent | ➡️ Pengelola server | HRD tetap mengirim User-Agent |
 | 4 | Koneksi lambat | ➡️ Pengelola server/jaringan | HRD tetap memakai retry |
 | 5 | Penghubung dosen–staf | ✅ Ditangani di HRD, **tidak perlu perubahan API** | Tautan disimpan di HRD (`staff_id`): otomatis lewat nama, bisa dikoreksi manual di form dosen |
-| 6 | Status aktif dosen | ✅ `StatusLogin` + filter `?aktif=`, **belum deploy** | Sinkron HRD sudah membaca `StatusLogin` (aktif/tidak) |
+| 6 | Status aktif dosen | ✅ **Lolos uji ulang 26/10** | Sinkron HRD sudah membaca `StatusLogin` (aktif/tidak) |
 
 Pengaman sementara di HRD (login ditolak bila tidak ada di master `/dosen` atau `/staff`) tetap dipertahankan.

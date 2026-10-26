@@ -9,8 +9,7 @@
 </head>
 <body class="bg-light d-flex align-items-center min-vh-100">
 @php
-    $otpAktif = \App\Models\Pengaturan::nilai('otp_aktif', '1') === '1';
-    $tab = $otpAktif && (session('tab') === 'otp' || old('identitas')) ? 'otp' : 'eu';
+    $tab = session('tab') === 'otp' || old('identitas') ? 'otp' : 'eu';
 @endphp
 <div class="container" style="max-width:420px">
     <div class="card shadow-sm">
@@ -22,12 +21,10 @@
             @if (session('error'))<div class="alert alert-danger py-2 small">{{ session('error') }}</div>@endif
             @if ($errors->any())<div class="alert alert-danger py-2 small">{{ $errors->first() }}</div>@endif
 
-            @if ($otpAktif)
             <ul class="nav nav-pills nav-fill mb-3 small" role="tablist">
                 <li class="nav-item"><button class="nav-link {{ $tab === 'eu' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#tabEu" type="button" role="tab"><i class="bi bi-person-lock me-1"></i>Akun eUniversity</button></li>
                 <li class="nav-item"><button class="nav-link {{ $tab === 'otp' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#tabOtp" type="button" role="tab"><i class="bi bi-telegram me-1"></i>NIP / NIDN</button></li>
             </ul>
-            @endif
 
             <div class="tab-content">
                 <div class="tab-pane fade {{ $tab === 'eu' ? 'show active' : '' }}" id="tabEu" role="tabpanel">
@@ -45,19 +42,27 @@
                     </form>
                 </div>
 
-                @if ($otpAktif)
                 <div class="tab-pane fade {{ $tab === 'otp' ? 'show active' : '' }}" id="tabOtp" role="tabpanel">
                     <form method="post" action="{{ route('login.otp.kirim') }}" onsubmit="sibuk(this)">
                         @csrf
                         <div class="mb-3">
-                            <label class="form-label">NIP (pegawai) / NIDN (dosen)</label>
+                            <label class="form-label">NIP / NIDN / username</label>
                             <input name="identitas" class="form-control" value="{{ old('identitas') }}" required @if ($tab === 'otp') autofocus @endif inputmode="text" placeholder="mis. 13.PCT.07">
-                            <div class="form-text"><i class="bi bi-telegram me-1"></i>Kode OTP akan dikirim ke Telegram Anda yang terdaftar di HRD.</div>
+                            <div class="form-text"><i class="bi bi-telegram me-1"></i>Kode OTP dikirim bot eUniversity ke Telegram Anda. Pastikan sudah menekan Start di bot tersebut.</div>
                         </div>
                         <button class="btn btn-primary w-100"><i class="bi bi-send me-1"></i>Kirim Kode OTP</button>
                     </form>
+                    @if (session('kandidat'))
+                        <div class="mt-3 small text-muted">Pilih username Anda:</div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            @foreach (session('kandidat') as $u)
+                                <form method="post" action="{{ route('login.otp.kirim') }}" onsubmit="sibuk(this)">@csrf
+                                    <input type="hidden" name="identitas" value="{{ $u }}"><button class="btn btn-sm btn-outline-primary">{{ $u }}</button>
+                                </form>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
-                @endif
             </div>
         </div>
     </div>

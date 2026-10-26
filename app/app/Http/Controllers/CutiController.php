@@ -18,8 +18,7 @@ class CutiController extends Controller
 
         if (!$this->isAdmin()) {
             // Pegawai melihat cutinya sendiri + cuti bawahan langsung (atasan_id)
-            $me = $this->myStaffId();
-            $query->whereIn('staff_id', Staff::where('atasan_id', $me)->pluck('id')->push($me));
+            $query->whereIn('staff_id', Staff::whereIn('atasan_id', $this->myStaffIds())->pluck('id')->merge($this->myStaffIds()));
         }
 
         $cuti = $query->when($request->status, fn ($q, $s) => $q->where('status', $s))
@@ -68,7 +67,7 @@ class CutiController extends Controller
     public function proses(Request $request, Cuti $cuti)
     {
         // Yang boleh memproses: admin HRD, atau atasan langsung pemohon (atasan_id diisi HRD)
-        $isAtasan = $this->myStaffId() && $cuti->staff?->atasan_id == $this->myStaffId();
+        $isAtasan = $this->myStaffIds()->contains($cuti->staff?->atasan_id);
         abort_unless($this->isAdmin() || $isAtasan, 403);
         abort_unless($cuti->status === 'Menunggu', 422, 'Cuti sudah diproses.');
 

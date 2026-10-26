@@ -8,8 +8,8 @@
 @section('content')
 <ul class="nav nav-tabs mb-0">
     <li class="nav-item"><a class="nav-link {{ $tab === 'saya' ? 'active' : '' }}" href="?tab=saya">Pengajuan Saya</a></li>
-    @if ($jumlahAtasan || $tab === 'atasan')
-        <li class="nav-item"><a class="nav-link {{ $tab === 'atasan' ? 'active' : '' }}" href="?tab=atasan">Perlu Persetujuan Saya
+    @if ($punyaBawahan)
+        <li class="nav-item"><a class="nav-link {{ $tab === 'atasan' ? 'active' : '' }}" href="?tab=atasan">Pengajuan Bawahan
             @if ($jumlahAtasan)<span class="badge text-bg-warning ms-1">{{ $jumlahAtasan }}</span>@endif</a></li>
     @endif
     @can('admin')
@@ -19,17 +19,19 @@
 </ul>
 
 <div class="card border-top-0 rounded-top-0">
-    @if ($tab === 'semua')
+    @if ($tab !== 'saya')
     <form class="bar-filter rounded-0">
-        <input type="hidden" name="tab" value="semua">
+        <input type="hidden" name="tab" value="{{ $tab }}">
         <select name="status" class="form-select" onchange="this.form.submit()">
             <option value="">Semua status</option>
             @foreach (\App\Models\Pengajuan::STATUS as $s)<option @selected(request('status') === $s)>{{ $s }}</option>@endforeach
         </select>
+        @if ($tab === 'semua')
         <select name="jenis" class="form-select" style="max-width:280px" onchange="this.form.submit()">
             <option value="">Semua jenis</option>
             @foreach ($jenisList as $id => $nama)<option value="{{ $id }}" @selected(request('jenis') == $id)>{{ $nama }}</option>@endforeach
         </select>
+        @endif
         <span class="info">{{ $pengajuan->total() }} pengajuan</span>
     </form>
     @endif
@@ -45,7 +47,7 @@
                     <td>{{ $p->namaPengaju($me) }}@unless ($p->anonim)<br><small class="text-muted">{{ $p->staff->divisi ?? '' }}</small>@endunless</td>
                 @endif
                 <td><span class="badge text-bg-{{ \App\Models\Pengajuan::WARNA[$p->status] }}">{{ $p->status }}</span></td>
-                <td class="text-end"><a href="{{ route('pengajuan.show', $p) }}" class="btn btn-sm btn-outline-secondary">{{ $tab === 'saya' ? 'Lihat' : 'Proses' }}</a></td>
+                <td class="text-end"><a href="{{ route('pengajuan.show', $p) }}" class="btn btn-sm btn-outline-secondary">{{ $tab !== 'saya' && !$p->selesai() ? 'Proses' : 'Lihat' }}</a></td>
             </tr>
         @empty
             <tr><td colspan="5" class="text-center text-muted py-4">

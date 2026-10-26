@@ -32,7 +32,12 @@ class AuthController extends Controller
         if (!$profil) {
             return back()->withInput()->with('error', 'Username atau password salah');
         }
+        return $this->masuk($request, $api, $profil);
+    }
 
+    // Dipakai login password & login OTP: tentukan peran, simpan akun, simpan token eUniversity di session
+    public function masuk(Request $request, PctApi $api, array $profil)
+    {
         // Username login = Username di master staff/dosen (salinan sinkron)
         $staff = Staff::where('username', $profil['username'])->first();
         $dosen = Dosen::where('username', $profil['username'])->first();
@@ -40,7 +45,7 @@ class AuthController extends Controller
         [$peran, $tolak] = $this->tentukanPeran($profil, $staff, $dosen);
         if ($tolak) {
             $api->logout($profil['token']);
-            return back()->withInput()->with('error', $tolak);
+            return redirect()->route('login')->withInput($request->only('username'))->with('error', $tolak);
         }
 
         $akun = Akun::updateOrCreate(['api_id' => $profil['api_id']], [

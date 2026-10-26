@@ -47,9 +47,49 @@ class PctApi
             return null;
         }
         $res->throw();
+        return $this->profil($res->json('data.token'), $res->json('data.user'));
+    }
 
-        $token = $res->json('data.token');
-        $user = $res->json('data.user');
+    /**
+     * Login OTP Telegram (diurus eUniversity). Kirim: null = terkirim, selain itu [error, pesan, data].
+     * error: not_found, ambigu (data.kandidat = daftar username), telegram_belum_terhubung, terlalu_sering, ...
+     */
+    public function otpKirim(string $identitas): ?array
+    {
+        $res = $this->http(null, 1)->post('/auth/otp/kirim', compact('identitas'));
+        return $res->successful() ? null : $this->galat($res);
+    }
+
+    // Verifikasi kode → [profil, null] bila benar, [null, galat] bila ditolak
+    public function otpVerifikasi(string $identitas, string $kode): array
+    {
+        $res = $this->http(null, 1)->post('/auth/otp/verifikasi', compact('identitas', 'kode'));
+        if (!$res->successful()) {
+            return [null, $this->galat($res)];
+        }
+        return [$this->profil($res->json('data.token'), $res->json('data.user')), null];
+    }
+
+    // Token atas nama aplikasi HRD (cukup X-API-Key) untuk sinkron terjadwal tanpa password orang
+    public function tokenAplikasi(): string
+    {
+        return $this->cek($this->http(null, 8, 3000)->post('/auth/token'))->json('data.token');
+    }
+
+    private function galat($res): array
+    {
+        if ($res->serverError()) {
+            $res->throw();
+        }
+        return ['error' => $res->json('error'), 'pesan' => $res->json('message'), 'data' => (array) $res->json('data')];
+    }
+
+    // Profil yang dibutuhkan HRD dari token + user hasil login
+    private function profil(string $token, array $user): array
+    {
+        // Balasan verifikasi OTP mungkin tanpa id → ambil dari /me
+        $user['id'] ??= $this->http($token)->get('/me')->json('data.id');
+        $username = $user['username'];
         $scopes = $user['scopes'] ?? [];
 
         // Profil staff/dosen hanya bisa dibaca bila punya scope read; cocokkan persis Username ("q" bersifat like)

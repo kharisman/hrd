@@ -56,7 +56,7 @@ class DashboardController extends Controller
         $akun = auth('pegawai')->user();
         $staff = $akun->staff()->with('atasan')->first();
         $me = $staff?->id;
-        $bawahan = $me ? Staff::where('atasan_id', $me)->pluck('id') : collect();
+        $bawahan = Staff::whereIn('atasan_id', $this->myStaffIds())->pluck('id');
 
         return view('dashboard.pegawai', [
             'akun' => $akun,

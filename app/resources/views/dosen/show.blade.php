@@ -29,7 +29,6 @@
         </div>
     </div>
     <div class="col-md-6 d-flex flex-column gap-3">
-        @include('_telegram', ['model' => $dosen, 'aksi' => route('dosen.telegram', $dosen)])
         @include('riwayat._daftar', ['staffId' => $dosen->staff_id, 'dosenId' => $dosen->id])
     </div>
 </div>

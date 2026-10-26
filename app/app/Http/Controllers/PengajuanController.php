@@ -16,24 +16,28 @@ class PengajuanController extends Controller
     public function index(Request $r)
     {
         $me = $this->myStaffId();
-        $bawahan = $me ? Staff::where('atasan_id', $me)->pluck('id') : collect();
+        $bawahan = $this->bawahan();
         $tab = $r->input('tab', $this->isAdmin() ? 'semua' : 'saya');
 
         $q = Pengajuan::with('jenis', 'staff')->latest();
         if ($tab === 'atasan') {
-            $q->whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', Pengajuan::MENUNGGU_ATASAN);
+            // Semua pengajuan bawahan (riwayat juga); yang menunggu persetujuan di atas
+            $q->whereIn('staff_id', $bawahan)->where('anonim', false)
+                ->orderByRaw('status = ? desc', [Pengajuan::MENUNGGU_ATASAN])
+                ->when($r->status, fn ($w, $v) => $w->where('status', $v));
         } elseif ($tab === 'semua') {
             abort_unless($this->isAdmin(), 403);
             $q->when($r->status, fn ($w, $v) => $w->where('status', $v))
                 ->when($r->jenis, fn ($w, $v) => $w->where('jenis_pengajuan_id', $v));
         } else {
-            $q->where('staff_id', $me ?? 0);
+            $q->whereIn('staff_id', $this->myStaffIds());
         }
 
         return view('pengajuan.index', [
             'pengajuan' => $q->paginate(25)->withQueryString(),
             'tab' => $tab,
             'me' => $me,
+            'punyaBawahan' => $bawahan->isNotEmpty(),
             'jumlahAtasan' => $bawahan->isEmpty() ? 0 : Pengajuan::whereIn('staff_id', $bawahan)->where('anonim', false)->where('status', Pengajuan::MENUNGGU_ATASAN)->count(),
             'jumlahHrd' => $this->isAdmin() ? Pengajuan::where('status', Pengajuan::MENUNGGU_HRD)->count() : 0,
             'jenisList' => JenisPengajuan::orderBy('urutan')->pluck('nama', 'id'),
@@ -121,7 +125,7 @@ class PengajuanController extends Controller
     // Pengaju membatalkan selama belum selesai diproses
     public function batal(Pengajuan $pengajuan)
     {
-        abort_unless($pengajuan->staff_id === $this->myStaffId() && !$pengajuan->selesai(), 403);
+        abort_unless($this->myStaffIds()->contains($pengajuan->staff_id) && !$pengajuan->selesai(), 403);
         $pengajuan->update(['status' => 'Dibatalkan']);
         return back()->with('ok', 'Pengajuan dibatalkan.');
     }
@@ -160,22 +164,31 @@ class PengajuanController extends Controller
         return Storage::response($path);
     }
 
+    // Pegawai yang atasannya salah satu akun staff saya
+    private function bawahan()
+    {
+        $ids = $this->myStaffIds();
+        return $ids->isEmpty() ? collect() : Staff::whereIn('atasan_id', $ids)->pluck('id');
+    }
+
+    private function atasannya(Pengajuan $p): bool
+    {
+        return $this->myStaffIds()->contains(Staff::whereKey($p->staff_id)->value('atasan_id'));
+    }
+
     private function bolehLihat(Pengajuan $p): bool
     {
-        $me = $this->myStaffId();
-        $atasannya = !$p->anonim && $me && Staff::whereKey($p->staff_id)->value('atasan_id') === $me;
-        return $this->isAdmin() || ($me && $p->staff_id === $me) || $atasannya;
+        return $this->isAdmin() || $this->myStaffIds()->contains($p->staff_id) || (!$p->anonim && $this->atasannya($p));
     }
 
     // 'atasan' / 'hrd' / null: tahap yang boleh diproses user ini sekarang
     private function tahapProses(Pengajuan $p): ?string
     {
-        $me = $this->myStaffId();
-        if ($p->status === Pengajuan::MENUNGGU_ATASAN && $me && Staff::whereKey($p->staff_id)->value('atasan_id') === $me) {
+        if ($p->status === Pengajuan::MENUNGGU_ATASAN && $this->atasannya($p)) {
             return 'atasan';
         }
         // HRD boleh memutus di tahap mana pun yang masih berjalan (mis. atasan tidak aktif), kecuali pengajuannya sendiri
-        if ($this->isAdmin() && !$p->selesai() && $p->staff_id !== $me) {
+        if ($this->isAdmin() && !$p->selesai() && !$this->myStaffIds()->contains($p->staff_id)) {
             return 'hrd';
         }
         return null;

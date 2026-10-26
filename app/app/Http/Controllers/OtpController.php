@@ -2,129 +2,83 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Akun;
-use App\Models\Dosen;
-use App\Models\Otp;
-use App\Models\Pengaturan;
-use App\Models\Staff;
-use App\Services\Telegram;
+use App\Services\PctApi;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 
-// Login dengan NIP (pegawai) / NIDN (dosen) + kode OTP via Telegram. Meniru alur BAAK:
-// 1) masukkan NIP/NIDN → kode 6 digit dikirim ke Telegram, 2) masukkan kode → masuk.
-// Kode disimpan ter-hash, berlaku 5 menit, sekali pakai, maks 5 kali salah. Tanpa token eUniversity:
-// aksi yang menulis ke eUniversity tetap terkunci untuk sesi ini.
+// Login NIP / NIDN / username + kode OTP Telegram. Kode, chat ID, batas percobaan & rate limit
+// semuanya diurus eUniversity (/auth/otp/*); hasilnya token eUniversity milik pegawai itu sendiri,
+// jadi sesi OTP setara login password.
 class OtpController extends Controller
 {
     const BERLAKU_MENIT = 5;
-    const MAKS_SALAH = 5;
 
-    public function kirim(Request $r, Telegram $telegram)
+    const PESAN = [
+        'not_found' => 'NIP / NIDN / username tidak ditemukan atau akunnya tidak aktif.',
+        'telegram_belum_terhubung' => 'Telegram Anda belum terdaftar di eUniversity. Hubungi admin eUniversity.',
+        'terlalu_sering' => 'Terlalu sering meminta kode (maks. 3 kali per 15 menit). Coba lagi nanti.',
+        'kode_salah' => 'Kode OTP salah.',
+        'kode_tidak_berlaku' => 'Kode OTP sudah tidak berlaku. Minta kode baru.',
+        'terkunci' => 'Kode salah 5 kali dan dikunci. Minta kode baru.',
+    ];
+
+    public function kirim(Request $r, PctApi $api)
     {
-        abort_unless(Pengaturan::nilai('otp_aktif', '1') === '1', 404);
-        $id = trim($r->validate(['identitas' => 'required|string|max:30'], [], ['identitas' => 'NIP / NIDN'])['identitas']);
+        $id = trim($r->validate(['identitas' => 'required|string|max:50'], [], ['identitas' => 'NIP / NIDN'])['identitas']);
 
-        // Batasi pengiriman: 3 kali per menit per NIP/NIDN + IP
-        $kunci = 'otp-kirim:' . strtolower($id) . '|' . $r->ip();
-        if (RateLimiter::tooManyAttempts($kunci, 3)) {
-            return back()->withInput()->with('error', 'Terlalu sering meminta kode. Coba lagi dalam ' . RateLimiter::availableIn($kunci) . ' detik.')->with('tab', 'otp');
+        try {
+            $galat = $api->otpKirim($id);
+        } catch (ConnectionException|RequestException $e) {
+            report($e);
+            return $this->gagal('Server eUniversity tidak bisa dihubungi. Coba lagi beberapa saat.');
         }
-        RateLimiter::hit($kunci, 60);
-
-        [$staff, $dosen] = $this->cari($id);
-        if (!$staff && !$dosen) {
-            return back()->withInput()->with('error', 'NIP/NIDN tidak ditemukan atau tidak aktif.')->with('tab', 'otp');
-        }
-        $chat = $staff->telegram ?? null ?: $dosen->telegram ?? null;
-        if (!$chat) {
-            return back()->withInput()->with('error', 'Akun Telegram Anda belum terdaftar di HRD. Hubungi bagian SDM.')->with('tab', 'otp');
+        if ($galat) {
+            // Satu NIP dipakai beberapa akun → pegawai memilih username-nya
+            return $galat['error'] === 'ambigu'
+                ? $this->gagal('NIP/NIDN ini dipakai lebih dari satu akun. Pilih username Anda.')->with('kandidat', $galat['data']['kandidat'] ?? [])
+                : $this->gagal(self::PESAN[$galat['error']] ?? $galat['pesan'] ?? 'Kode OTP tidak bisa dikirim.');
         }
 
-        // Kode lama yang belum dipakai dibatalkan; hanya kode terbaru yang berlaku
-        Otp::where('staff_id', $staff?->id)->where('dosen_id', $dosen?->id)->whereNull('dipakai_at')->update(['dipakai_at' => now()]);
-        $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        Otp::create([
-            'staff_id' => $staff?->id, 'dosen_id' => $dosen?->id,
-            'kode_hash' => Hash::make($kode), 'kedaluwarsa_at' => now()->addMinutes(self::BERLAKU_MENIT),
-        ]);
-
-        $nama = $staff->nama ?? $dosen->nama;
-        if ($galat = $telegram->kirim($chat, "🔐 *Kode OTP Login HRD*\n\nHalo *{$nama}*,\n\nKode OTP Anda: *{$kode}*\n\n_Kode berlaku " . self::BERLAKU_MENIT . " menit. Jangan bagikan ke siapa pun._")) {
-            return back()->withInput()->with('error', $galat)->with('tab', 'otp');
-        }
-
-        session(['otp_target' => ['staff_id' => $staff?->id, 'dosen_id' => $dosen?->id, 'nama' => $nama]]);
+        session(['otp_identitas' => $id]);
         return redirect()->route('login.otp')->with('ok', 'Kode OTP telah dikirim ke Telegram Anda.');
     }
 
     public function formKode()
     {
-        if (!session('otp_target')) {
-            return redirect()->route('login')->with('error', 'Sesi kedaluwarsa. Silakan masukkan NIP/NIDN lagi.')->with('tab', 'otp');
+        if (!session('otp_identitas')) {
+            return $this->gagal('Sesi kedaluwarsa. Silakan masukkan NIP/NIDN lagi.');
         }
-        return view('login-otp', ['nama' => session('otp_target.nama'), 'menit' => self::BERLAKU_MENIT]);
+        return view('login-otp', ['nama' => session('otp_identitas'), 'menit' => self::BERLAKU_MENIT]);
     }
 
-    public function verifikasi(Request $r)
+    public function verifikasi(Request $r, PctApi $api)
     {
         $kode = $r->validate(['kode' => 'required|digits:6'], ['kode.digits' => 'Kode OTP terdiri dari 6 angka.'])['kode'];
-        $target = session('otp_target');
-        if (!$target) {
-            return redirect()->route('login')->with('error', 'Sesi kedaluwarsa. Silakan masukkan NIP/NIDN lagi.')->with('tab', 'otp');
+        if (!$id = session('otp_identitas')) {
+            return $this->gagal('Sesi kedaluwarsa. Silakan masukkan NIP/NIDN lagi.');
         }
 
-        $otp = Otp::where('staff_id', $target['staff_id'])->where('dosen_id', $target['dosen_id'])
-            ->whereNull('dipakai_at')->where('kedaluwarsa_at', '>', now())->latest('id')->first();
-        if (!$otp) {
-            return back()->with('error', 'Kode OTP sudah kedaluwarsa. Minta kode baru.');
+        try {
+            [$profil, $galat] = $api->otpVerifikasi($id, $kode);
+        } catch (ConnectionException|RequestException $e) {
+            report($e);
+            return back()->with('error', 'Server eUniversity tidak bisa dihubungi. Coba lagi.');
         }
-        if (!Hash::check($kode, $otp->kode_hash)) {
-            $otp->increment('percobaan');
-            if ($otp->percobaan >= self::MAKS_SALAH) {
-                $otp->update(['dipakai_at' => now()]);   // hangus: cegah tebak-tebakan
-                return back()->with('error', 'Kode salah ' . self::MAKS_SALAH . ' kali. Kode dibatalkan, silakan minta kode baru.');
-            }
-            return back()->with('error', 'Kode OTP salah. Sisa percobaan: ' . (self::MAKS_SALAH - $otp->percobaan) . '.');
+        if ($galat) {
+            $pesan = self::PESAN[$galat['error']] ?? $galat['pesan'] ?? 'Kode OTP ditolak.';
+            // Kode mati → kembali ke awal untuk minta kode baru
+            return in_array($galat['error'], ['kode_tidak_berlaku', 'terkunci', 'not_found'])
+                ? $this->gagal($pesan)->withInput(['identitas' => $id])
+                : back()->with('error', $pesan);
         }
-        $otp->update(['dipakai_at' => now()]);
 
-        $akun = $this->akun(Staff::find($target['staff_id']), Dosen::find($target['dosen_id']));
-        session()->forget('otp_target');
-        auth('pegawai')->login($akun);
-        $r->session()->regenerate();
-        return redirect()->route('dashboard')->with('ok', "Selamat datang, {$akun->name}!");
+        session()->forget('otp_identitas');
+        return app(AuthController::class)->masuk($r, $api, $profil);
     }
 
-    // NIP → pegawai aktif (satu NIP bisa beberapa akun staff: ambil yang aktif dulu), NIDN → dosen aktif
-    private function cari(string $id): array
+    private function gagal(string $pesan)
     {
-        $staff = Staff::where('nip', $id)->where('aktif', true)->orderBy('id')->first();
-        $dosen = Dosen::where('nidn', $id)->where('aktif', true)->first()
-            ?? ($staff ? Dosen::where('staff_id', $staff->id)->where('aktif', true)->first() : null);
-        $staff ??= $dosen?->staff_id ? Staff::find($dosen->staff_id) : null;
-        return [$staff, $dosen];
-    }
-
-    // Pakai akun yang sudah ada (username sama; peran tetap) atau buat akun baru tanpa id eUniversity
-    private function akun(?Staff $staff, ?Dosen $dosen): Akun
-    {
-        $username = $staff->username ?? $dosen->username ?? 'nip:' . ($staff->nip ?? $dosen->nidn);
-        $akun = Akun::firstOrNew(['username' => $username]);
-        $akun->fill([
-            'name' => $staff->nama ?? $dosen->nama,
-            'roles' => $akun->roles ?? [],
-            'scopes' => $akun->exists ? $akun->scopes : [],
-            'peran' => $akun->peran ?? ($dosen ? 'dosen' : 'staff'),
-            'nip' => $staff?->nip,
-            'staff_id' => $staff?->id,
-            'nidn' => $dosen?->nidn,
-            'dosen_id' => $dosen?->id,
-            'divisi' => $staff?->divisi,
-            'level' => $staff?->level,
-            'last_login_at' => now(),
-        ])->save();
-        return $akun;
+        return redirect()->route('login')->withInput(request()->only('identitas'))->with('error', $pesan)->with('tab', 'otp');
     }
 }

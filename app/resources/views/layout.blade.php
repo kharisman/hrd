@@ -47,22 +47,23 @@
 <div id="progres" role="progressbar" aria-label="Memuat"></div>
 @php
     $admin = Gate::allows('admin');
+    // Item: [route, pola aktif, ikon, label]. Grup yang bisa dilipat: ['grup', id, judul, ikon, route induk|null, item]
+    // Item grup: [route, ikon, label, 'aktif' => pola?]; tanpa pola: route-nya sendiri, untuk *.index juga turunannya (mis. jenis-cuti.*)
     $menu = array_filter([
         ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
-        ['staff.index', ['staff.index', 'staff.show', 'staff.create', 'staff.edit'], 'people', $admin ? 'Data Pegawai' : 'Profil Saya'],
-        $admin ? ['staff.atasan', 'staff.atasan*', 'diagram-3', 'Atasan & Bawahan'] : null,
-        $admin ? ['dosen.index', 'dosen*', 'mortarboard', 'Data Dosen'] : null,
+        $admin ? ['grup', 'grupMaster', 'Master Data', 'database', null, [
+            ['staff.index', 'people', 'Data Pegawai', 'aktif' => ['staff.index', 'staff.show', 'staff.create', 'staff.edit']],
+            ['staff.atasan', 'diagram-3', 'Atasan & Bawahan', 'aktif' => 'staff.atasan*'],
+            ['dosen.index', 'mortarboard', 'Data Dosen', 'aktif' => 'dosen*'],
+        ]] : ['staff.index', 'staff.*', 'people', 'Profil Saya'],
         $admin ? ['riwayat.index', 'riwayat*', 'journal-bookmark', 'Studi Lanjut'] : null,
         ['cuti.index', 'cuti.*', 'calendar-check', 'Cuti & Izin'],
         ['pengajuan.index', 'pengajuan.*', 'ui-checks', 'Pengajuan'],
+        $admin ? ['grup', 'grupLaporan', 'Laporan', 'file-earmark-bar-graph', 'laporan.index', \App\Support\Menu::laporan()] : null,
+        $admin ? ['grup', 'grupPengaturan', 'Pengaturan', 'gear', 'pengaturan.index', \App\Support\Menu::pengaturan()] : null,
     ]);
-    // Grup yang bisa dilipat: [id, judul, ikon, route induk, item]
-    // Item aktif: route-nya sendiri; untuk *.index juga semua turunannya (mis. jenis-cuti.*)
-    $aktif = fn ($r) => request()->routeIs($r) || (str_ends_with($r, '.index') && request()->routeIs(\Illuminate\Support\Str::beforeLast($r, '.') . '.*'));
-    $grup = $admin ? [
-        ['grupLaporan', 'Laporan', 'file-earmark-bar-graph', 'laporan.index', \App\Support\Menu::laporan()],
-        ['grupPengaturan', 'Pengaturan', 'gear', 'pengaturan.index', \App\Support\Menu::pengaturan()],
-    ] : [];
+    $aktif = fn ($m) => isset($m['aktif']) ? request()->routeIs($m['aktif'])
+        : request()->routeIs($m[0]) || (str_ends_with($m[0], '.index') && request()->routeIs(\Illuminate\Support\Str::beforeLast($m[0], '.') . '.*'));
 @endphp
 
 {{-- Offcanvas: sidebar tetap di desktop, laci di mobile --}}
@@ -74,22 +75,23 @@
     </div>
     {{-- flex-nowrap: tanpa ini .nav melipat ke kolom kedua saat menu lebih tinggi dari layar --}}
     <nav class="nav flex-column flex-nowrap p-2 gap-1 flex-grow-1 overflow-y-auto overflow-x-hidden" id="menu" style="min-height:0">
-        @foreach ($menu as [$route, $pattern, $icon, $label])
-            <a href="{{ route($route) }}" class="nav-link {{ request()->routeIs($pattern) ? 'active' : '' }}">
-                <i class="bi bi-{{ $icon }} me-2"></i>{{ $label }}
-            </a>
-        @endforeach
-
-        @foreach ($grup as [$id, $judul, $ikon, $induk, $item])
-            @php($buka = request()->routeIs($induk) || collect($item)->contains(fn ($m) => $aktif($m[0])))
+        @foreach ($menu as $m)
+            @if ($m[0] !== 'grup')
+                <a href="{{ route($m[0]) }}" class="nav-link {{ request()->routeIs($m[1]) ? 'active' : '' }}">
+                    <i class="bi bi-{{ $m[2] }} me-2"></i>{{ $m[3] }}
+                </a>
+                @continue
+            @endif
+            @php([, $id, $judul, $ikon, $induk, $item] = $m)
+            @php($buka = ($induk && request()->routeIs($induk)) || collect($item)->contains($aktif))
             <a class="nav-link d-flex align-items-center {{ $buka ? 'text-white' : '' }}" data-bs-toggle="collapse" href="#{{ $id }}" role="button" aria-expanded="{{ $buka ? 'true' : 'false' }}">
                 <i class="bi bi-{{ $ikon }} me-2"></i>{{ $judul }}<i class="bi bi-chevron-down ms-auto small"></i>
             </a>
             <div class="collapse {{ $buka ? 'show' : '' }}" id="{{ $id }}">
                 <nav class="nav flex-column gap-1 ms-3 mb-1">
-                    @foreach ($item as [$route, $icon, $label])
-                        <a href="{{ route($route) }}" class="nav-link py-1 small {{ $aktif($route) ? 'active' : '' }}">
-                            <i class="bi bi-{{ $icon }} me-2"></i>{{ $label }}
+                    @foreach ($item as $i)
+                        <a href="{{ route($i[0]) }}" class="nav-link py-1 small {{ $aktif($i) ? 'active' : '' }}">
+                            <i class="bi bi-{{ $i[1] }} me-2"></i>{{ $i[2] }}
                         </a>
                     @endforeach
                 </nav>
@@ -99,7 +101,6 @@
     <div class="p-3 border-top border-secondary small">
         <div class="fw-semibold">{{ auth()->user()->name }}</div>
         <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran] }}</div>
-        <a href="{{ route('telegram-saya') }}" class="btn btn-sm btn-outline-light w-100 mb-2"><i class="bi bi-telegram me-1"></i>Telegram Saya</a>
         <form method="post" action="{{ route('logout') }}" data-no-ajax>@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
     </div>
 </aside>

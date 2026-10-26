@@ -46,7 +46,6 @@
             </table>
         </div>
 
-        @include('_telegram', ['model' => $staff, 'aksi' => route('staff.telegram', $staff)])
 
         @include('riwayat._daftar', ['staffId' => $staff->id])
 

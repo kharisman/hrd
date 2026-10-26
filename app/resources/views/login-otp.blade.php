@@ -14,7 +14,7 @@
             <div class="text-center mb-3">
                 <i class="bi bi-telegram text-primary" style="font-size:2.6rem"></i>
                 <h5 class="mt-2 mb-1">Masukkan Kode OTP</h5>
-                <div class="text-muted small">Kode 6 angka telah dikirim ke Telegram <strong>{{ $nama }}</strong>. Berlaku {{ $menit }} menit.</div>
+                <div class="text-muted small">Kode 6 angka telah dikirim ke Telegram akun <strong>{{ $nama }}</strong>. Berlaku {{ $menit }} menit.</div>
             </div>
             @if (session('ok'))<div class="alert alert-success py-2 small">{{ session('ok') }}</div>@endif
             @if (session('error'))<div class="alert alert-danger py-2 small">{{ session('error') }}</div>@endif

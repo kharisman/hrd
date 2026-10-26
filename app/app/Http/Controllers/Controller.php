@@ -21,4 +21,12 @@ class Controller extends BaseController
     {
         return auth('pegawai')->user()?->staff_id;
     }
+
+    // Semua akun staff milik orang yang login (satu NIP bisa punya beberapa akun, mis. beda divisi)
+    protected function myStaffIds(): \Illuminate\Support\Collection
+    {
+        $id = $this->myStaffId();
+        $nip = $id ? \App\Models\Staff::whereKey($id)->value('nip') : null;
+        return $nip ? \App\Models\Staff::where('nip', $nip)->pluck('id') : collect($id ? [$id] : []);
+    }
 }

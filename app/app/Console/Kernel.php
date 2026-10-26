@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        // Butuh cron server: * * * * * php artisan schedule:run
+        $schedule->command('hrd:sync')->dailyAt('02:00')->withoutOverlapping();
     }
 
     /**
