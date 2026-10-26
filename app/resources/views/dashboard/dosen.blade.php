@@ -122,11 +122,11 @@
                 @foreach ($baris as $x)
                     {{-- TA berjalan memakai jumlah dosen aktif sekarang --}}
                     @php($nDosen = $jumlahPerProdi[$x->program_studi] ?? 0)
-                    @php($kurang = (int) ceil($x->jumlah_mahasiswa / $x->target) - $nDosen)
+                    @php($kurang = (int) ceil($x->jumlah_mahasiswa / \App\Models\RasioProdi::TARGET) - $nDosen)
                     <tr class="{{ $ta === $taTerakhir ? '' : 'text-muted' }}">
                         <td>{{ $loop->first ? $ta : '' }}</td><td>{{ $x->program_studi }}</td>
                         <td class="text-end">{{ $ta === $taTerakhir ? $nDosen : '·' }}</td>
-                        <td class="text-end" @if ($x->per_angkatan) title="{{ collect($x->per_angkatan)->map(fn ($n, $kode) => 'Angkatan ' . ($labelAngkatan[$x->program_studi][$kode] ?? $kode) . ': ' . $n)->join(PHP_EOL) }}" @endif>{{ $x->jumlah_mahasiswa }}@if ($x->sumber === 'api') <i class="bi bi-cloud-check text-success" title="Dari eUniversity (mahasiswa aktif)"></i>@endif</td>
+                        <td class="text-end" @if ($x->per_angkatan) title="{{ collect($x->per_angkatan)->map(fn ($n, $kode) => 'Angkatan ' . ($labelAngkatan[$x->program_studi][$kode] ?? $kode) . ': ' . $n)->join(PHP_EOL) }}" @endif>{{ $x->jumlah_mahasiswa }}</td>
                         <td class="text-end">@if ($ta === $taTerakhir && $nDosen) 1 : {{ round($x->jumlah_mahasiswa / $nDosen, 1) }} @endif</td>
                         <td class="text-end {{ $ta === $taTerakhir && $kurang > 0 ? 'text-danger fw-semibold' : '' }}">{{ $ta === $taTerakhir ? max(0, $kurang) : '' }}</td>
                     </tr>
@@ -136,26 +136,8 @@
             @endforelse
         </table>
         </div>
-        @if ($bolehUbah)
-            <form method="post" action="{{ route('dashboard.dosen.rasio') }}" class="card-footer bg-white small">
-                @csrf
-                <div class="fw-semibold mb-1">Isi jumlah mahasiswa</div>
-                <div class="d-flex flex-wrap gap-2 align-items-end">
-                    <div><label class="form-label mb-0">TA</label>
-                        @if ($periodeTa->isNotEmpty())
-                            <select name="tahun_ajaran" class="form-select form-select-sm" style="width:120px">@foreach ($periodeTa as $t)<option @selected($t === $taTerakhir)>{{ $t }}</option>@endforeach</select>
-                        @else
-                            <input name="tahun_ajaran" value="{{ $taTerakhir }}" class="form-control form-control-sm" style="width:100px" required>
-                        @endif</div>
-                    @foreach (\App\Models\Dosen::daftarProdi() as $p)
-                        <div><label class="form-label mb-0">{{ $p }}</label><input name="mahasiswa[{{ $p }}]" type="number" min="0" class="form-control form-control-sm" style="width:110px"
-                            value="{{ $rasio[$taTerakhir]?->firstWhere('program_studi', $p)?->jumlah_mahasiswa }}"></div>
-                    @endforeach
-                    <div><label class="form-label mb-0">Target</label><input name="target" type="number" value="22" min="1" class="form-control form-control-sm" style="width:70px"></div>
-                    <button class="btn btn-sm btn-primary">Simpan</button>
-                </div>
-            </form>
-        @endif
+        <div class="card-footer bg-white small text-muted"><i class="bi bi-cloud-check text-success me-1"></i>Jumlah mahasiswa aktif dari eUniversity (diperbarui tiap sinkron).
+            Target maks. {{ \App\Models\RasioProdi::TARGET }} mahasiswa per dosen. Arahkan kursor ke angka mahasiswa untuk rincian per angkatan.</div>
     </div></div>
 </div>
 @endsection

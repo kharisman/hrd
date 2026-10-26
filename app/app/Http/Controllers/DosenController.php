@@ -35,20 +35,6 @@ class DosenController extends Controller
         return view('dosen.index', compact('dosen'));
     }
 
-    public function sinkron(Sinkron $sinkron)
-    {
-        $this->wajibScope('staff.read', 'dosen.read');
-        set_time_limit(0); // jaringan ke API lambat, bisa beberapa menit
-        try {
-            $s = $sinkron->jalankan();
-        } catch (\Illuminate\Http\Client\ConnectionException|\Illuminate\Http\Client\RequestException $e) {
-            report($e);
-            return back()->withErrors('Sinkron gagal: server eUniversity tidak bisa dihubungi. Coba lagi nanti.');
-        }
-        return back()->with('ok', "Sinkron selesai: {$s['staff_api']} pegawai ({$s['staff_aktif']} aktif) & {$s['dosen_api']} dosen dari API "
-            . "({$s['dosen_baru']} dosen baru, {$s['dosen_diperbarui']} diperbarui, {$s['dosen_tertaut_pegawai']} tertaut pegawai).");
-    }
-
     public function show(Dosen $dosen)
     {
         $dosen->load('staff');

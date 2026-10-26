@@ -438,28 +438,6 @@ class ImporDashboard
             ?? ($this->dosenBernama($nama)?->staff);
     }
 
-    // Tab Rasio: blok "Rasio Dosen TA xxxx/yyyy" berisi prodi, jumlah dosen, jumlah mahasiswa, rasio, target
-    public function rasio(string $file): int
-    {
-        $rows = $this->baris($this->tab($file, ['Rasio'])->getSheetByName('Rasio'));
-        $n = 0;
-        $atas = collect($rows)->search(fn ($r) => collect($r)->contains(fn ($v) => str_contains((string) $v, 'Rasio Dosen TA')));
-        foreach ($atas === false ? [] : $rows[$atas] as $c => $v) {
-            if (!preg_match('#TA (\d{4}/\d{4})#', (string) $v, $ta)) {
-                continue;
-            }
-            foreach (array_slice($rows, $atas + 2) as $r) {
-                if (!($prodi = $this->prodi($r[$c] ?? null)) || !is_numeric($r[$c + 2] ?? null)) {
-                    continue;
-                }
-                RasioProdi::updateOrCreate(['program_studi' => $prodi, 'tahun_ajaran' => $ta[1]],
-                    ['jumlah_mahasiswa' => (int) $r[$c + 2], 'target' => (int) ($r[$c + 4] ?: 22)]);
-                $n++;
-            }
-        }
-        return $n;
-    }
-
     // Hanya tab yang dibutuhkan, tanpa format: workbook dashboard puluhan tab & grafik terlalu berat dibuka utuh
     private function tab(string $file, array $tabs)
     {

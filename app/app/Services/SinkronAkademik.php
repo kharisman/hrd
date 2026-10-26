@@ -19,24 +19,61 @@ class SinkronAkademik
 {
     const PERIODE_MENGAJAR = 6; // periode reguler terakhir (≈ 3 tahun) untuk "pernah mengampu"
 
+    /**
+     * Langkah sinkron yang bisa dijalankan terpisah (menu Sinkron), urut sesuai ketergantungan.
+     * [label, endpoint API, langkah yang perlu lebih dulu]
+     */
+    const LANGKAH = [
+        'prodi' => ['Program Studi', '/prodi', []],
+        'kurikulum' => ['Kurikulum', '/kurikulum', ['prodi']],
+        'periode' => ['Periode Kuliah (KRS)', '/krs', []],
+        'angkatan' => ['Angkatan', '/angkatan', ['prodi', 'kurikulum']],
+        'struktur' => ['Struktur Divisi × Level', '/struktur', []],
+        'mahasiswa' => ['Jumlah Mahasiswa Aktif (rasio)', '/mahasiswa', ['prodi', 'periode']],
+        'dosen_pa' => ['Bimbingan Akademik (PA)', '/dosen-pa', ['pegawai_dosen']],
+        'penguji' => ['Dosen Penguji', '/pkl-skripsi/penguji', ['pegawai_dosen']],
+        'mengajar' => ['Kelas yang Diampu', '/krs/{id}/grup', ['pegawai_dosen', 'periode']],
+        'bimbingan' => ['Bimbingan PKL / Proposal / Skripsi', '/pkl-skripsi/{jenis}/{idKRS}', ['pegawai_dosen', 'periode']],
+        'tautan_mk' => ['Tautan MK Inti ke Kurikulum', '/kurikulum/{id}/detail', ['prodi', 'kurikulum', 'angkatan']],
+    ];
+
     public function __construct(private PctApi $api) {}
 
+    // Semua langkah berurutan (hrd:sync)
     public function jalankan(): array
     {
-        $prodi = $this->prodi();
-        return [
-            'prodi' => $prodi->count(),
+        return collect(array_keys(self::LANGKAH))->mapWithKeys(fn ($k) => [$k => $this->satu($k)])->all();
+    }
+
+    // Satu langkah; hasil = jumlah baris yang diproses. Waktu & hasil dicatat untuk halaman Sinkron.
+    public function satu(string $langkah): int
+    {
+        $prodiS1 = fn () => Prodi::where(['aktif' => true, 'jenjang' => 'Strata Satu'])->get();
+        $hasil = match ($langkah) {
+            'prodi' => $this->prodi()->count(),
             'kurikulum' => $this->kurikulum(),
-            'periode_krs' => $this->periode(),
+            'periode' => $this->periode(),
             'angkatan' => $this->angkatan(),
-            'rasio_dari_api' => $this->rasio($prodi),
-            'dosen_pa' => $this->dosenPa(),
-            'kelas_diampu' => $this->mengajar(),
-            'bimbingan_pkl_skripsi' => $this->bimbingan(),
-            'dosen_penguji' => $this->penguji(),
             'struktur' => $this->struktur(),
-            'mk_tertaut' => $this->tautkanMk($prodi),
-        ];
+            'mahasiswa' => $this->rasio($prodiS1()),
+            'dosen_pa' => $this->dosenPa(),
+            'penguji' => $this->penguji(),
+            'mengajar' => $this->mengajar(),
+            'bimbingan' => $this->bimbingan(),
+            'tautan_mk' => $this->tautkanMk($prodiS1()),
+        };
+        self::catat($langkah, $hasil);
+        return $hasil;
+    }
+
+    public static function catat(string $langkah, int $hasil): void
+    {
+        \App\Models\Pengaturan::simpan(["sinkron:$langkah" => json_encode(['waktu' => now()->toDateTimeString(), 'hasil' => $hasil])]);
+    }
+
+    public static function terakhir(string $langkah): ?array
+    {
+        return json_decode((string) \App\Models\Pengaturan::nilai("sinkron:$langkah"), true) ?: null;
     }
 
     private function prodi()
@@ -85,22 +122,19 @@ class SinkronAkademik
         return Angkatan::count();
     }
 
-    /**
-     * Jumlah mahasiswa aktif per prodi S1 untuk tahun ajaran periode KRS terbaru.
-     * ponytail: bila API melaporkan 0 mahasiswa aktif di semua prodi (data uji beta1), angka manual tidak ditimpa
-     */
+    // Jumlah mahasiswa aktif per prodi S1 & per angkatan untuk tahun ajaran periode KRS terbaru (selalu dari API, termasuk 0)
     private function rasio($prodi): int
     {
         $ta = PeriodeKrs::tahunAjaran()->first();
         // Hanya kolom yang perlu (tanpa data pribadi): prodi & angkatan tiap mahasiswa aktif
         $mhs = collect($this->api->ambilSemua(['/mahasiswa'], ['status' => 'aktif', 'fields' => 'idMhs,idPStudi,Angkatan'])['/mahasiswa']);
-        if (!$ta || $mhs->isEmpty()) {
+        if (!$ta) {
             return 0;
         }
         foreach ($prodi as $p) {
             $milik = $mhs->where('idPStudi', $p->api_id);
             RasioProdi::updateOrCreate(['program_studi' => $p->nama, 'tahun_ajaran' => $ta], [
-                'jumlah_mahasiswa' => $milik->count(), 'per_angkatan' => $milik->countBy('Angkatan')->sortKeysDesc()->all(), 'sumber' => 'api',
+                'jumlah_mahasiswa' => $milik->count(), 'per_angkatan' => $milik->countBy('Angkatan')->sortKeysDesc()->all(),
             ]);
         }
         return $prodi->count();

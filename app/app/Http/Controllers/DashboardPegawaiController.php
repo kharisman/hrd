@@ -26,7 +26,7 @@ class DashboardPegawaiController extends Controller
 
     public function __invoke(Request $r)
     {
-        $tab = in_array($r->tab, ['kehadiran', 'turnover', 'disc', 'input']) ? $r->tab : 'kehadiran';
+        $tab = in_array($r->tab, ['ringkasan', 'kehadiran', 'turnover', 'disc', 'input']) ? $r->tab : 'ringkasan';
         $tahun = $r->integer('tahun') ?: (int) (Kehadiran::max('tahun') ?? now()->year);
         $orang = $this->orang(Staff::aktif());
         $kelompok = $r->kelompok && $orang->contains('kelompok', $r->kelompok) ? $r->kelompok : null;
@@ -39,6 +39,7 @@ class DashboardPegawaiController extends Controller
             'daftarTahun' => Kehadiran::distinct()->orderByDesc('tahun')->pluck('tahun')->push(now()->year)->unique()->sortDesc()->values(),
         ] + match ($tab) {
             'kehadiran' => $this->kehadiran($orang, $tahun, $kelompok),
+            'ringkasan' => app(DashboardController::class)->ringkasan(),
             'turnover' => $this->turnover(),
             'disc' => $this->disc($r),
             'input' => $this->formInput($orang, $tahun, $r->integer('bulan') ?: now()->month),

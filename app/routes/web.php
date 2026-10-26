@@ -12,6 +12,7 @@ use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\RaporDosenController;
+use App\Http\Controllers\SinkronController;
 use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
@@ -31,8 +32,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::get('sinkron', [SinkronController::class, 'index'])->name('sinkron.index');
+    Route::post('sinkron/{langkah}', [SinkronController::class, 'jalankan'])->name('sinkron.jalankan');
     Route::get('dashboard/dosen', DashboardDosenController::class)->name('dashboard.dosen');
-    Route::post('dashboard/dosen/rasio', [DashboardDosenController::class, 'simpanRasio'])->name('dashboard.dosen.rasio');
     Route::get('dashboard/dosen/mk', [DashboardDosenController::class, 'mk'])->name('dashboard.dosen.mk');
     Route::post('dashboard/dosen/mk', [DashboardDosenController::class, 'simpanMk'])->name('dashboard.dosen.mk.simpan');
     Route::post('dashboard/dosen/mk/tambah', [DashboardDosenController::class, 'tambahMk'])->name('dashboard.dosen.mk.tambah');
@@ -51,7 +53,6 @@ Route::middleware('auth')->group(function () {
     Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
     Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');
     Route::resource('pegawai', StaffController::class)->parameters(['pegawai' => 'staff'])->names('staff');
-    Route::post('dosen/sinkron', [DosenController::class, 'sinkron'])->name('dosen.sinkron');
     Route::resource('dosen', DosenController::class);
     Route::get('riwayat/impor', [RiwayatController::class, 'imporForm'])->name('riwayat.impor');
     Route::post('riwayat/impor', [RiwayatController::class, 'impor']);
@@ -74,7 +75,6 @@ Route::middleware('auth')->group(function () {
         Route::get('pejabat', 'pejabat')->name('pejabat');
         Route::post('pejabat', 'tambahPejabat')->name('pejabat.tambah');
         Route::delete('pejabat/{pejabat}', 'hapusPejabat')->name('pejabat.hapus');
-        Route::get('sinkron', 'sinkron')->name('sinkron');
         Route::get('api', 'api')->name('api');
         Route::post('api/cek', 'cekApi')->name('api.cek');
     });

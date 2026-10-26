@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'Dashboard Pegawai')
+@section('title', 'Dashboard')
 
 @php
     $B = \App\Models\Kehadiran::BULAN;
@@ -10,11 +10,14 @@
 
 @section('content')
 <ul class="nav nav-tabs mb-0">
-    @foreach (['kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over', 'disc' => 'Peta Karakter (DISC)'] + (Gate::allows('admin') ? ['input' => 'Input Rekap Bulanan'] : []) as $k => $l)
+    @foreach (['ringkasan' => 'Ringkasan', 'kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over', 'disc' => 'Peta Karakter (DISC)'] + (Gate::allows('admin') ? ['input' => 'Input Rekap Bulanan'] : []) as $k => $l)
         <li class="nav-item"><a class="nav-link {{ $tab === $k ? 'active' : '' }}" href="{{ route('dashboard.pegawai', ['tab' => $k, 'tahun' => $tahun]) }}">{{ $l }}</a></li>
     @endforeach
 </ul>
 
+@if ($tab === 'ringkasan')
+<div class="mt-3">@include('dashboard._ringkasan')</div>
+@else
 <div class="card border-top-0 rounded-top-0 mb-3">
     @if (in_array($tab, ['kehadiran', 'input']))
     <form class="bar-filter rounded-0">
@@ -223,5 +226,6 @@
         </div>
     </form>
 </div>
+@endif
 @endif
 @endsection

@@ -52,11 +52,11 @@
     // Dashboard analitik: admin semua, Warek I dosen, Warek II pegawai. Lebih dari satu → digabung dalam grup Dashboard.
     $peran = \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : []);
     $dasbor = array_values(array_filter([
+        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Ringkasan & Pegawai', 'aktif' => ['dashboard', 'dashboard.pegawai*']] : null,
         $admin || $peran->contains('warek1') ? ['dashboard.dosen', 'clipboard-data', 'Dosen', 'aktif' => 'dashboard.dosen*'] : null,
-        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Pegawai', 'aktif' => 'dashboard.pegawai*'] : null,
     ]));
     $menu = array_filter([
-        $dasbor ? ['grup', 'grupDashboard', 'Dashboard', 'speedometer2', null, [['dashboard', 'house', 'Ringkasan', 'aktif' => 'dashboard'], ...$dasbor]]
+        $dasbor ? ['grup', 'grupDashboard', 'Dashboard', 'speedometer2', null, $admin || $peran->contains('warek2') ? $dasbor : [['dashboard', 'house', 'Ringkasan', 'aktif' => 'dashboard'], ...$dasbor]]
             : ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
         $admin ? ['grup', 'grupMaster', 'Master Data', 'database', null, [
             ['staff.index', 'people', 'Data Pegawai', 'aktif' => ['staff.index', 'staff.show', 'staff.create', 'staff.edit']],
@@ -65,6 +65,7 @@
             ['riwayat.index', 'journal-bookmark', 'Studi Lanjut', 'aktif' => 'riwayat*'],
         ]] : ['staff.index', 'staff.*', 'people', 'Profil Saya'],
         ['pengajuan.index', 'pengajuan.*', 'ui-checks', 'Pengajuan'],
+        $admin ? ['sinkron.index', 'sinkron.*', 'arrow-repeat', 'Sinkron eUniversity'] : null,
         $admin ? ['grup', 'grupLaporan', 'Laporan', 'file-earmark-bar-graph', 'laporan.index', \App\Support\Menu::laporan()] : null,
         $admin ? ['grup', 'grupPengaturan', 'Pengaturan', 'gear', 'pengaturan.index', \App\Support\Menu::pengaturan()] : null,
     ]);

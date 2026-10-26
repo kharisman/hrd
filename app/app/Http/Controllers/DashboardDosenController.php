@@ -45,32 +45,10 @@ class DashboardDosenController extends Controller
             'ringkas' => $this->ringkas($dosen),
             'perProdi' => collect(Dosen::daftarProdi())->mapWithKeys(fn ($p) => [$p => $this->ringkas($semua->where('prodi', $p))]),
             'rasio' => RasioProdi::orderBy('tahun_ajaran')->get()->groupBy('tahun_ajaran'),
-            'periodeTa' => PeriodeKrs::tahunAjaran(),
             // Label angkatan per prodi: kode angkatan → tahun ajaran masuk
             'labelAngkatan' => Prodi::where('jenjang', 'Strata Satu')->get()->mapWithKeys(fn ($p) => [$p->nama => Angkatan::where('prodi_api_id', $p->api_id)->pluck('periode', 'kode')]),
             'jumlahPerProdi' => $semua->countBy('prodi'),
-            'bolehUbah' => $this->isAdmin(),
         ]);
-    }
-
-    // Admin mengisi jumlah mahasiswa per prodi per TA
-    public function simpanRasio(Request $r)
-    {
-        abort_unless($this->isAdmin(), 403);
-        $periode = PeriodeKrs::tahunAjaran();
-        $d = $r->validate([
-            // Tahun ajaran dari periode KRS eUniversity (format bebas hanya bila periode belum disinkron)
-            'tahun_ajaran' => ['required', 'regex:#^\d{4}/\d{4}$#', $periode->isNotEmpty() ? Rule::in($periode) : 'string'],
-            'mahasiswa' => 'required|array',
-            'mahasiswa.*' => 'nullable|integer|min:0',
-            'target' => 'required|integer|min:1|max:99',
-        ], ['tahun_ajaran.regex' => 'Format tahun ajaran: 2026/2027.']);
-        foreach ($d['mahasiswa'] as $p => $n) {
-            if (in_array($p, Dosen::daftarProdi()) && $n !== null) {
-                RasioProdi::updateOrCreate(['program_studi' => $p, 'tahun_ajaran' => $d['tahun_ajaran']], ['jumlah_mahasiswa' => $n, 'target' => $d['target']]);
-            }
-        }
-        return back()->with('ok', "Jumlah mahasiswa TA {$d['tahun_ajaran']} disimpan.");
     }
 
     // ---- Penguasaan mata kuliah inti (matriks MK x dosen) ----

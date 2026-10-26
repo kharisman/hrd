@@ -78,17 +78,6 @@ class PengaturanController extends Controller
 
     // ---- Sinkron eUniversity ----
 
-    public function sinkron()
-    {
-        $waktu = fn ($v) => $v ? Carbon::parse($v) : null;
-        return view('pengaturan.sinkron', [
-            'info' => [
-                ['Pegawai (staff)', Staff::count(), $waktu(Staff::max('disinkron_at'))],
-                ['Dosen', Dosen::count(), $waktu(Dosen::max('disinkron_at'))],
-            ],
-        ]);
-    }
-
     // ---- Integrasi API ----
 
     public function api()

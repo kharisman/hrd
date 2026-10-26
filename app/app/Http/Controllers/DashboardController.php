@@ -13,10 +13,12 @@ class DashboardController extends Controller
 {
     public function __invoke()
     {
-        return $this->isAdmin() ? $this->admin() : $this->pegawai();
+        // Admin: ringkasan SDM ada di tab pertama Dashboard Pegawai
+        return $this->isAdmin() ? redirect()->route('dashboard.pegawai') : $this->pegawai();
     }
 
-    private function admin()
+    // Data tab Ringkasan di Dashboard Pegawai
+    public function ringkasan(): array
     {
         $hariIni = now()->toDateString();
         $cutiMenunggu = Pengajuan::cuti()->menunggu();
@@ -28,7 +30,7 @@ class DashboardController extends Controller
         $hitung = fn ($q, $kolom, $kosong) => $q->selectRaw("coalesce($kolom, '$kosong') k, count(*) c")
             ->groupBy('k')->orderByDesc('c')->toBase()->pluck('c', 'k');
 
-        return view('dashboard.admin', [
+        return [
             'kartu' => [
                 ['Pegawai aktif', Staff::aktif()->count(), 'people', route('staff.index'), 'dari ' . Staff::count() . ' akun staff'],
                 ['Dosen aktif', (clone $dosenAktif)->count(), 'mortarboard', route('dosen.index'), 'dari ' . Dosen::count() . ' dosen terdaftar'],
@@ -51,7 +53,7 @@ class DashboardController extends Controller
             'perDivisi' => $hitung(Staff::aktif(), 'divisi', 'Tanpa divisi'),
             'jabfung' => $hitung(clone $dosenAktif, 'jabatan_fungsional', 'Belum diisi'),
             'pendidikan' => $hitung(clone $dosenAktif, 'pendidikan_terakhir', 'Belum diisi'),
-        ]);
+        ];
     }
 
     private function pegawai()

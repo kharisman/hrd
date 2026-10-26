@@ -1,7 +1,4 @@
-@extends('layout')
-@section('title', 'Dashboard')
-
-@section('content')
+{{-- Ringkasan SDM (dulu halaman Dashboard admin), tab pertama Dashboard Pegawai --}}
 {{-- Kartu angka utama --}}
 <div class="row g-3 mb-3 row-cols-2 row-cols-md-3 row-cols-xl-5">
     @foreach ($kartu as [$label, $nilai, $ikon, $url, $ket])
@@ -86,4 +83,3 @@
     <div class="col-lg-4">@include('dashboard._batang', ['judul' => 'Jabatan Fungsional Dosen Aktif', 'data' => $jabfung])</div>
     <div class="col-lg-4">@include('dashboard._batang', ['judul' => 'Pendidikan Terakhir Dosen Aktif', 'data' => $pendidikan])</div>
 </div>
-@endsection

@@ -10,7 +10,9 @@ Artisan::command('hrd:sync', function () {
     try {
         app()->instance(App\Services\PctApi::class, $api->pakaiToken($token));
         $this->info('Menarik data staff & dosen dari API eUniversity...');
-        foreach (app(App\Services\Sinkron::class)->jalankan() as $k => $v) {
+        $s = app(App\Services\Sinkron::class)->jalankan();
+        App\Services\SinkronAkademik::catat('pegawai_dosen', $s['staff_api'] + $s['dosen_api']);
+        foreach ($s as $k => $v) {
             $this->line(str_pad($k, 24) . $v);
         }
         $this->info('Menarik data akademik (prodi, mahasiswa, kelas, kurikulum)...');
@@ -29,7 +31,6 @@ Artisan::command('hrd:impor-dashboard {hrd} {dosen} {--simpan}', function (strin
     DB::beginTransaction();
     $k = $imp->karyawan($hrd);
     $j = $imp->jafung($dosen);
-    $r = $imp->rasio($dosen);
     $h = $imp->kehadiran($hrd);
     $mk = $imp->penguasaanMk($dosen);
     $kp = $imp->kompetensi($dosen);
@@ -37,7 +38,7 @@ Artisan::command('hrd:impor-dashboard {hrd} {dosen} {--simpan}', function (strin
     $rp = $imp->rapor($dosen);
     $this->info("DISC: {$dc['orang']} orang, rapor: {$rp['dosen']} dosen ({$rp['capaian']} capaian)");
     $this->info("Mata kuliah inti: {$mk['mk']}, skill kompetensi: {$kp['skill']}");
-    $this->info("Pegawai diperbarui: {$k['pegawai']}, dosen (tab db): {$k['dosen']}, dosen (tab jafung): {$j['dosen']}, rasio prodi: {$r}, data kehadiran bulanan: {$h}");
+    $this->info("Pegawai diperbarui: {$k['pegawai']}, dosen (tab db): {$k['dosen']}, dosen (tab jafung): {$j['dosen']}, data kehadiran bulanan: {$h}");
     foreach ([...$k['tak_cocok'], ...$j['tak_cocok'], ...$mk['tak_cocok'], ...$kp['tak_cocok'], ...$dc['tak_cocok'], ...$rp['tak_cocok']] as $x) {
         $this->warn("  tidak cocok: $x");
     }
