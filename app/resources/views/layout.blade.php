@@ -53,6 +53,8 @@
         ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
         $admin || \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : [])->contains('warek1')
             ? ['dashboard.dosen', 'dashboard.dosen*', 'clipboard-data', 'Dashboard Dosen'] : null,
+        $admin || \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : [])->contains('warek2')
+            ? ['dashboard.pegawai', 'dashboard.pegawai*', 'person-lines-fill', 'Dashboard Pegawai'] : null,
         $admin ? ['grup', 'grupMaster', 'Master Data', 'database', null, [
             ['staff.index', 'people', 'Data Pegawai', 'aktif' => ['staff.index', 'staff.show', 'staff.create', 'staff.edit']],
             ['staff.atasan', 'diagram-3', 'Atasan & Bawahan', 'aktif' => 'staff.atasan*'],

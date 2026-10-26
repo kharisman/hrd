@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Dosen;
+use App\Models\Kehadiran;
 use App\Models\RasioProdi;
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
@@ -100,6 +101,32 @@ class ImporDashboard
         return $hasil;
     }
 
+    // Tab "Data Keterlambatan" (menit) & "Data Kehadiran" (hari tidak hadir): NIP, tahun, kolom Januari–Desember
+    public function kehadiran(string $file): int
+    {
+        $buku = $this->tab($file, $tabs = ['Data Keterlambatan' => 'terlambat_menit', 'Data Kehadiran' => 'tidak_hadir_hari']);
+        $n = 0;
+        foreach ($tabs as $tab => $kolom) {
+            $rows = $this->baris($buku->getSheetByName($tab));
+            $judul = collect($rows)->search(fn ($r) => in_array('Januari', $r, true));
+            $awal = array_search('Januari', $rows[$judul], true);
+            foreach (array_slice($rows, $judul + 2) as $r) {
+                $nip = trim((string) ($r[2] ?? ''));
+                if (!preg_match('/^\d+\.PCT\.\d+$/', $nip) || !is_numeric($r[5] ?? null)) {
+                    continue;
+                }
+                foreach (range(0, 11) as $i) {
+                    $v = $r[$awal + $i] ?? null;
+                    if (is_numeric($v)) {
+                        Kehadiran::updateOrCreate(['nip' => $nip, 'tahun' => (int) $r[5], 'bulan' => $i + 1], [$kolom => $v]);
+                        $n++;
+                    }
+                }
+            }
+        }
+        return $n;
+    }
+
     // Tab Rasio: blok "Rasio Dosen TA xxxx/yyyy" berisi prodi, jumlah dosen, jumlah mahasiswa, rasio, target
     public function rasio(string $file): int
     {
@@ -125,6 +152,7 @@ class ImporDashboard
     // Hanya tab yang dibutuhkan, tanpa format: workbook dashboard puluhan tab & grafik terlalu berat dibuka utuh
     private function tab(string $file, array $tabs)
     {
+        $tabs = array_is_list($tabs) ? $tabs : array_keys($tabs);
         $baca = IOFactory::createReaderForFile($file);
         $baca->setLoadSheetsOnly($tabs);
         return $baca->load($file);

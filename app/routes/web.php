@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardDosenController;
+use App\Http\Controllers\DashboardPegawaiController;
 use App\Http\Controllers\DosenController;
 use App\Http\Controllers\JenisCutiController;
 use App\Http\Controllers\JenisPengajuanController;
@@ -31,6 +32,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('dashboard/dosen', DashboardDosenController::class)->name('dashboard.dosen');
     Route::post('dashboard/dosen/rasio', [DashboardDosenController::class, 'simpanRasio'])->name('dashboard.dosen.rasio');
+    Route::get('dashboard/pegawai', DashboardPegawaiController::class)->name('dashboard.pegawai');
+    Route::post('dashboard/pegawai/kehadiran', [DashboardPegawaiController::class, 'simpan'])->name('dashboard.pegawai.simpan');
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
     Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
     Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');

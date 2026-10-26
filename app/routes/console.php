@@ -26,7 +26,8 @@ Artisan::command('hrd:impor-dashboard {hrd} {dosen} {--simpan}', function (strin
     $k = $imp->karyawan($hrd);
     $j = $imp->jafung($dosen);
     $r = $imp->rasio($dosen);
-    $this->info("Pegawai diperbarui: {$k['pegawai']}, dosen (tab db): {$k['dosen']}, dosen (tab jafung): {$j['dosen']}, rasio prodi: {$r}");
+    $h = $imp->kehadiran($hrd);
+    $this->info("Pegawai diperbarui: {$k['pegawai']}, dosen (tab db): {$k['dosen']}, dosen (tab jafung): {$j['dosen']}, rasio prodi: {$r}, data kehadiran bulanan: {$h}");
     foreach ([...$k['tak_cocok'], ...$j['tak_cocok']] as $x) {
         $this->warn("  tidak cocok: $x");
     }
