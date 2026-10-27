@@ -6,6 +6,9 @@
 @endsection
 
 @section('content')
+@if ($jatah)
+    <div class="mb-3" style="max-width:720px">@include('_jatah-cuti', ['jatah' => $jatah, 'ajukan' => true])</div>
+@endif
 <ul class="nav nav-tabs mb-0">
     @if ($bisaMenyetujui)
         <li class="nav-item"><a class="nav-link {{ $tab === 'tugas' ? 'active' : '' }}" href="?tab=tugas">Perlu Persetujuan Saya

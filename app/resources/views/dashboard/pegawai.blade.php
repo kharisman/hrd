@@ -32,26 +32,7 @@
 
 <div class="row g-3">
     <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header">Jatah Cuti {{ now()->year }}</div>
-            <div class="card-body">
-                @forelse ($jatah as $r)
-                    <div class="batang" style="grid-template-columns: minmax(110px, 40%) 1fr 70px"
-                         title="{{ $r->jenis->nama }}: terpakai {{ $r->terpakai }}{{ $r->kuota ? ' dari '.$r->kuota : '' }} hari">
-                        <div class="batang-label text-truncate">{{ $r->jenis->nama }}</div>
-                        @if ($r->kuota)
-                            <div class="batang-jalur"><div class="batang-isi" style="width: {{ $r->sisa / $r->kuota * 100 }}%"></div></div>
-                            <div class="batang-nilai"><strong>{{ $r->sisa }}</strong>/{{ $r->kuota }} hari</div>
-                        @else
-                            <div class="small text-muted">tanpa batas · terpakai {{ $r->terpakai }} hari</div><div></div>
-                        @endif
-                    </div>
-                @empty
-                    <div class="text-muted small">Akun belum tertaut ke data pegawai, jatah cuti belum bisa ditampilkan.</div>
-                @endforelse
-                @if ($jatah->isNotEmpty())<div class="small text-muted mt-2">Batang = sisa jatah. Jatah reset tiap 1 Januari.</div>@endif
-            </div>
-        </div>
+        @include('_jatah-cuti', ['jatah' => $jatah, 'ajukan' => true])
     </div>
     <div class="col-lg-6">
         <div class="card h-100">

@@ -18,7 +18,7 @@ class JenisCuti extends Model
 
     /**
      * Rekap jatah per jenis untuk satu pegawai (boleh beberapa akun staff ber-NIP sama) di satu tahun kalender.
-     * Terpakai = hari pengajuan cuti Disetujui + masih menunggu yang mulai di tahun itu. Tidak ada saldo tersimpan,
+     * Terpakai = hari cuti disetujui + masih dalam proses yang mulai di tahun itu. Tidak ada saldo tersimpan,
      * jadi jatah otomatis "reset" tiap 1 Januari dan sisa tahun lalu tidak terbawa.
      * ponytail: cuti yang melewati pergantian tahun dihitung penuh di tahun mulainya
      *
@@ -26,19 +26,24 @@ class JenisCuti extends Model
      */
     public static function rekap(int|array $staffId, ?int $tahun = null)
     {
-        $terpakai = Pengajuan::cuti()->whereIn('staff_id', (array) $staffId)
-            ->where(fn ($q) => $q->where('status', 'Disetujui')->orWhere(fn ($w) => $w->menunggu()))
-            ->whereYear('tgl_mulai', $tahun ?? now()->year)
-            ->selectRaw('jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari')
-            ->groupBy('jenis_cuti_id')
+        // Hari cuti per jenis: disetujui & masih dalam proses persetujuan (keduanya mengurangi jatah)
+        $hari = fn ($q) => $q->whereIn('staff_id', (array) $staffId)->whereYear('tgl_mulai', $tahun ?? now()->year)
+            ->selectRaw('jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari')->groupBy('jenis_cuti_id')
             ->toBase() // tanpa model: kolom "hari" bentrok dengan accessor Pengajuan::getHariAttribute
             ->pluck('hari', 'jenis_cuti_id');
+        $disetujui = $hari(Pengajuan::cuti()->where('status', 'Disetujui'));
+        $proses = $hari(Pengajuan::cuti()->menunggu());
 
-        return self::where('aktif', true)->orderBy('id')->get()->map(fn ($j) => (object) [
-            'jenis' => $j,
-            'kuota' => $j->kuota,
-            'terpakai' => (int) ($terpakai[$j->id] ?? 0),
-            'sisa' => $j->kuota === null ? null : max(0, $j->kuota - (int) ($terpakai[$j->id] ?? 0)),
-        ])->keyBy(fn ($r) => $r->jenis->id);
+        return self::where('aktif', true)->orderBy('id')->get()->map(function ($j) use ($disetujui, $proses) {
+            $terpakai = (int) ($disetujui[$j->id] ?? 0) + (int) ($proses[$j->id] ?? 0);
+            return (object) [
+                'jenis' => $j,
+                'kuota' => $j->kuota,
+                'disetujui' => (int) ($disetujui[$j->id] ?? 0),
+                'proses' => (int) ($proses[$j->id] ?? 0),
+                'terpakai' => $terpakai,
+                'sisa' => $j->kuota === null ? null : max(0, $j->kuota - $terpakai),
+            ];
+        })->keyBy(fn ($r) => $r->jenis->id);
     }
 }

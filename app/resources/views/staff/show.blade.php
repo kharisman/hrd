@@ -71,5 +71,6 @@
         </div>
         @endif
     </div>
+    <div class="col-md-6">@include('_jatah-cuti', ['jatah' => $jatah, 'ajukan' => $staff->id == auth()->user()->staff_id])</div>
 </div>
 @endsection

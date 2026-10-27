@@ -97,7 +97,8 @@ class StaffController extends Controller
         abort_unless($this->isAdmin() || $staff->id == $this->myStaffId(), 403);
         $staff->load('atasan', 'bawahan', 'dosen');
         $riwayat = RiwayatPendidikan::milik($staff, $staff->dosen)->get();
-        return view('staff.show', compact('staff', 'riwayat'));
+        $jatah = \App\Models\JenisCuti::rekap($staff->nip ? Staff::where('nip', $staff->nip)->pluck('id')->all() : [$staff->id]);
+        return view('staff.show', compact('staff', 'riwayat', 'jatah'));
     }
 
     public function create()

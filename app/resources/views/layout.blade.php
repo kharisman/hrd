@@ -52,7 +52,7 @@
     // Dashboard analitik: admin semua, Warek I dosen, Warek II pegawai. Lebih dari satu → digabung dalam grup Dashboard.
     $peran = \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : []);
     $dasbor = array_values(array_filter([
-        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Ringkasan & Pegawai', 'aktif' => ['dashboard', 'dashboard.pegawai*']] : null,
+        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Pegawai', 'aktif' => ['dashboard', 'dashboard.pegawai*']] : null,
         $admin || $peran->contains('warek1') ? ['dashboard.dosen', 'clipboard-data', 'Dosen', 'aktif' => 'dashboard.dosen*'] : null,
     ]));
     $menu = array_filter([

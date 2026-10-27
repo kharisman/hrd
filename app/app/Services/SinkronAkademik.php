@@ -177,7 +177,9 @@ class SinkronAkademik
     {
         $dosen = Dosen::orderByDesc('aktif')->get(['id', 'nama'])->unique(fn ($d) => Sinkron::namaInti($d->nama))->keyBy(fn ($d) => Sinkron::namaInti($d->nama));
         $n = 0;
-        foreach (PeriodeKrs::whereIn('tipe', ['ganjil', 'genap'])->orderByDesc('api_id')->take(self::PERIODE_MENGAJAR)->get() as $k) {
+        // Hanya periode yang dilayani /pkl-skripsi (periode nonaktif/pendek dibalas 404)
+        $valid = collect($this->api->detail('/pkl-skripsi'))->pluck('idKRS');
+        foreach (PeriodeKrs::whereIn('api_id', $valid)->orderByDesc('api_id')->take(self::PERIODE_MENGAJAR)->get() as $k) {
             foreach (array_keys(Bimbingan::JENIS) as $jenis) {
                 $item = collect($this->api->detail("/pkl-skripsi/$jenis/{$k->api_id}")['items'] ?? []);
                 Bimbingan::where(['jenis' => $jenis, 'id_krs' => $k->api_id])->whereNotIn('api_id', $item->pluck('id'))->delete();

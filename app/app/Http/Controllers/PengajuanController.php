@@ -46,6 +46,7 @@ class PengajuanController extends Controller
             'me' => $me,
             'punyaBawahan' => $bawahan->isNotEmpty(),
             'jumlahTugas' => $jumlahTugas,
+            'jatah' => $tab === 'saya' && $me ? JenisCuti::rekap($this->myStaffIds()->all()) : null,
             // Tab "Perlu Persetujuan" tampil untuk siapa pun yang bisa memutus (atasan, pejabat, HRD)
             'bisaMenyetujui' => $jumlahTugas || $bawahan->isNotEmpty() || $this->isAdmin() || Pejabat::peranDari($this->myStaffIds())->isNotEmpty(),
             'jenisList' => JenisPengajuan::orderBy('urutan')->pluck('nama', 'id'),
