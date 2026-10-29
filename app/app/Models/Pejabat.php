@@ -18,9 +18,20 @@ class Pejabat extends Model
         return $this->belongsTo(Staff::class);
     }
 
-    // Peran yang dipegang orang ini (semua akun staff-nya)
+    // Peran yang bisa diambil dari role eUniversity (nama role = kunci peran); Keuangan belum punya role
+    const DARI_ROLE = ['warek1', 'warek2', 'baak'];
+
+    // Peran orang ini: penunjukan di HRD + role eUniversity pegawainya (warek1, warek2, baak)
     public static function peranDari($staffIds)
     {
-        return static::whereIn('staff_id', $staffIds)->pluck('peran')->unique()->values();
+        $roles = Staff::whereIn('id', $staffIds)->where('aktif', true)->pluck('roles')->flatten()->filter();
+        return static::whereIn('staff_id', $staffIds)->pluck('peran')
+            ->merge($roles->intersect(self::DARI_ROLE))->unique()->values();
+    }
+
+    // Pemegang peran dari role eUniversity (untuk ditampilkan di Pengaturan → Peran Pejabat)
+    public static function dariRole(string $peran)
+    {
+        return in_array($peran, self::DARI_ROLE) ? Staff::where('aktif', true)->whereJsonContains('roles', $peran)->orderBy('nama')->get() : collect();
     }
 }

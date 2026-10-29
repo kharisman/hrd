@@ -24,7 +24,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <ul class="nav nav-pills small">
-        @foreach (\App\Models\Dosen::daftarProdi() as $p)
+        @foreach (\App\Support\Akses::prodiDosen() as $p)
             <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen.mk', ['prodi' => $p]) }}">{{ $p }}</a></li>
         @endforeach
     </ul>

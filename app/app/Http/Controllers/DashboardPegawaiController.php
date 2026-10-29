@@ -19,7 +19,7 @@ class DashboardPegawaiController extends Controller
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
-            abort_unless($this->isAdmin() || Pejabat::peranDari($this->myStaffIds())->contains('warek2'), 403);
+            abort_unless(\App\Support\Akses::dashboardPegawai(), 403); // admin atau pimpinan (Rektor/Warek)
             return $next($request);
         });
     }

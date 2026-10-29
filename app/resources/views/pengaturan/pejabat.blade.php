@@ -16,8 +16,16 @@
         <div class="col">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between"><strong>{{ $nama }}</strong>
-                    <span class="badge text-bg-light">{{ count($pemegang[$kode] ?? []) }} orang</span></div>
+                    @php($dariRole = \App\Models\Pejabat::dariRole($kode))
+                    <span class="badge text-bg-light">{{ count($pemegang[$kode] ?? []) + $dariRole->count() }} orang</span></div>
                 <ul class="list-group list-group-flush">
+                    {{-- Pemegang role eUniversity (otomatis, diatur di eUniversity) --}}
+                    @foreach ($dariRole as $s)
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ $s->nama }}<br><small class="text-muted">{{ $s->level }} · {{ $s->divisi }}</small></span>
+                            <span class="badge text-bg-info" title="Dari role {{ $kode }} di eUniversity"><i class="bi bi-cloud-check me-1"></i>role {{ $kode }}</span>
+                        </li>
+                    @endforeach
                     @forelse ($pemegang[$kode] ?? [] as $p)
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>{{ $p->staff->nama ?? '#' . $p->staff_id }}
@@ -27,7 +35,10 @@
                             </form>
                         </li>
                     @empty
-                        <li class="list-group-item text-muted small">Belum ada pemegang. Pengajuan yang alurnya melewati {{ $nama }} akan tertahan.</li>
+                        @if ($dariRole->isEmpty())
+                            <li class="list-group-item text-muted small">Belum ada pemegang. Pengajuan yang alurnya melewati {{ $nama }} akan tertahan.
+                                @if (in_array($kode, \App\Models\Pejabat::DARI_ROLE))<br>Beri role <code>{{ $kode }}</code> di eUniversity, atau tunjuk di bawah.@endif</li>
+                        @endif
                     @endforelse
                 </ul>
                 <div class="card-footer bg-white">

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'Dashboard')
+@section('title', request()->routeIs('dashboard.saya') ? 'Dashboard Saya' : 'Dashboard')
 
 @section('actions')
     <a href="{{ route('pengajuan.create', ['jenis' => $jenisCuti]) }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>

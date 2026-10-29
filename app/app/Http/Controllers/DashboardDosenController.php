@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Angkatan;
 use App\Models\Dosen;
+use App\Support\Akses;
 use App\Models\PeriodeKrs;
 use App\Models\Prodi;
 use App\Models\Kompetensi;
@@ -35,16 +36,16 @@ class DashboardDosenController extends Controller
 
     public function __invoke(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : null;
-        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Dosen::daftarProdi())->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
+        $prodi = $this->prodiDipilih($r, null);
+        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Akses::prodiDosen())->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
         $dosen = $prodi ? $semua->where('prodi', $prodi)->values() : $semua;
 
         return view('dashboard.dosen', [
             'prodi' => $prodi,
             'dosen' => $dosen,
             'ringkas' => $this->ringkas($dosen),
-            'perProdi' => collect(Dosen::daftarProdi())->mapWithKeys(fn ($p) => [$p => $this->ringkas($semua->where('prodi', $p))]),
-            'rasio' => RasioProdi::orderBy('tahun_ajaran')->get()->groupBy('tahun_ajaran'),
+            'perProdi' => collect(Akses::prodiDosen())->mapWithKeys(fn ($p) => [$p => $this->ringkas($semua->where('prodi', $p))]),
+            'rasio' => RasioProdi::whereIn('program_studi', Akses::prodiDosen())->orderBy('tahun_ajaran')->get()->groupBy('tahun_ajaran'),
             // Label angkatan per prodi: kode angkatan → tahun ajaran masuk
             'labelAngkatan' => Prodi::where('jenjang', 'Strata Satu')->get()->mapWithKeys(fn ($p) => [$p->nama => Angkatan::where('prodi_api_id', $p->api_id)->pluck('periode', 'kode')]),
             'jumlahPerProdi' => $semua->countBy('prodi'),
@@ -55,7 +56,7 @@ class DashboardDosenController extends Controller
 
     public function mk(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : Dosen::daftarProdi()[0];
+        $prodi = $this->prodiDipilih($r, Akses::prodiDosen()[0]);
         $daftarKurikulum = $this->kurikulum($prodi);
         $kurikulum = $daftarKurikulum->contains($r->kurikulum) ? $r->kurikulum : $daftarKurikulum->first();
         $mk = MkInti::with('dosen:id')->where(['program_studi' => $prodi, 'kurikulum' => $kurikulum])->orderBy('urutan')->orderBy('id')->get();
@@ -91,7 +92,7 @@ class DashboardDosenController extends Controller
             'mk' => $mk, 'dosen' => $dosen, 'singkat' => $this->namaSingkat($dosen),
             'ubah' => $r->boolean('ubah') && $this->isAdmin(), 'bolehUbah' => $this->isAdmin(),
             // Kekurangan dosen semua prodi pada kurikulum terbaru masing-masing (seperti sheet SUMMARY)
-            'kurangSemua' => collect(Dosen::daftarProdi())->mapWithKeys(fn ($p) => [$p => MkInti::with('dosen:id')
+            'kurangSemua' => collect(Akses::prodiDosen())->mapWithKeys(fn ($p) => [$p => MkInti::with('dosen:id')
                 ->where(['program_studi' => $p, 'kurikulum' => $this->kurikulum($p)->first()])->orderBy('urutan')->get()
                 ->tap(fn ($c) => $this->hitungKuasai($c))->filter(fn ($m) => $m->gap < 0)]),
         ]);
@@ -147,10 +148,10 @@ class DashboardDosenController extends Controller
 
     public function kompetensi(Request $r)
     {
-        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : null;
+        $prodi = $this->prodiDipilih($r, null);
         $daftarTahun = Kompetensi::distinct()->orderByDesc('tahun')->pluck('tahun')->push(now()->year)->unique()->sortDesc()->values();
         $tahun = $daftarTahun->contains($r->integer('tahun')) ? $r->integer('tahun') : $daftarTahun->first();
-        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Dosen::daftarProdi())->orderBy('nama')->get();
+        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Akses::prodiDosen())->orderBy('nama')->get();
         $skill = Kompetensi::whereIn('dosen_id', $dosen->pluck('id'))->where('tahun', $tahun)->get()->groupBy('dosen_id');
         $lalu = Kompetensi::whereIn('dosen_id', $dosen->pluck('id'))->where('tahun', $tahun - 1)->get()->groupBy('dosen_id');
         $rata = function ($c, $k, $kol = 'sekarang') {
@@ -233,10 +234,16 @@ class DashboardDosenController extends Controller
             ? $depan[$d->id] . ' ' . mb_substr($kata($d)[1] ?? '', 0, 1) : $depan[$d->id]]);
     }
 
-    // Admin HRD atau Warek I (akademik)
+    // Admin, pimpinan (Rektor/Warek), atau kaprodi (prodinya saja) — lihat App\Support\Akses
     private function bolehLihat(): bool
     {
-        return $this->isAdmin() || Pejabat::peranDari($this->myStaffIds())->contains('warek1');
+        return Akses::dashboardDosen();
+    }
+
+    // Prodi dari ?prodi= bila boleh; tanpa akses semua prodi → prodi pertama yang boleh (kaprodi: prodinya)
+    private function prodiDipilih(Request $r, ?string $bawaan): ?string
+    {
+        return Akses::bolehProdi($r->prodi) ? $r->prodi : (Akses::semuaProdi() ? $bawaan : Akses::prodiDosen()[0]);
     }
 
     // Status jafung & serdos satu dosen

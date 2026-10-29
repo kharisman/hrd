@@ -87,6 +87,7 @@ class SinkronController extends Controller
             'mahasiswa' => RasioProdi::where('tahun_ajaran', PeriodeKrs::tahunAjaran()->first())->sum('jumlah_mahasiswa') . ' mahasiswa aktif',
             'dosen_pa' => Dosen::sum('jumlah_pa') . ' mahasiswa bimbingan',
             'penguji' => Dosen::where('penguji', true)->count() . ' dosen penguji',
+            'role' => Staff::whereNotNull('roles')->count() . ' pegawai ber-role',
             'mengajar' => Mengajar::count() . ' kelas',
             'bimbingan' => Bimbingan::count() . ' bimbingan',
             'tautan_mk' => MkInti::whereNotNull('kode_mk')->count() . ' / ' . MkInti::count() . ' MK tertaut',

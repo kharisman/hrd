@@ -32,6 +32,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::get('saya', [DashboardController::class, 'saya'])->name('dashboard.saya');
     Route::get('sinkron', [SinkronController::class, 'index'])->name('sinkron.index');
     Route::post('sinkron/{langkah}', [SinkronController::class, 'jalankan'])->name('sinkron.jalankan');
     Route::get('dashboard/dosen', DashboardDosenController::class)->name('dashboard.dosen');

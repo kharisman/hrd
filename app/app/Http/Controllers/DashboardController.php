@@ -56,6 +56,12 @@ class DashboardController extends Controller
         ];
     }
 
+    // Dashboard pribadi untuk admin/pejabat (yang juga pegawai): jatah cuti, cuti saya, persetujuan
+    public function saya()
+    {
+        return $this->pegawai();
+    }
+
     private function pegawai()
     {
         $akun = auth('pegawai')->user();

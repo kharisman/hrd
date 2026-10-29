@@ -49,14 +49,16 @@
     $admin = Gate::allows('admin');
     // Item: [route, pola aktif, ikon, label]. Grup yang bisa dilipat: ['grup', id, judul, ikon, route induk|null, item]
     // Item grup: [route, ikon, label, 'aktif' => pola?]; tanpa pola: route-nya sendiri, untuk *.index juga turunannya (mis. jenis-cuti.*)
-    // Dashboard analitik: admin semua, Warek I dosen, Warek II pegawai. Lebih dari satu → digabung dalam grup Dashboard.
+    // Dashboard analitik mengikuti role & level eUniversity (App\Support\Akses): admin/Rektor/Warek semua, kaprodi dosen prodinya.
     $peran = \App\Models\Pejabat::peranDari(auth()->user()->staff_id ? [auth()->user()->staff_id] : []);
     $dasbor = array_values(array_filter([
-        $admin || $peran->contains('warek2') ? ['dashboard.pegawai', 'person-lines-fill', 'Pegawai', 'aktif' => ['dashboard', 'dashboard.pegawai*']] : null,
-        $admin || $peran->contains('warek1') ? ['dashboard.dosen', 'clipboard-data', 'Dosen', 'aktif' => 'dashboard.dosen*'] : null,
+        \App\Support\Akses::dashboardPegawai() ? ['dashboard.pegawai', 'person-lines-fill', 'Pegawai', 'aktif' => ['dashboard', 'dashboard.pegawai*']] : null,
+        \App\Support\Akses::dashboardDosen() ? ['dashboard.dosen', 'clipboard-data', 'Dosen', 'aktif' => 'dashboard.dosen*'] : null,
     ]));
+    // Yang punya dashboard SDM tetap pegawai: dashboard pribadinya di "Saya"
+    $saya = ['dashboard.saya', 'person-circle', 'Saya', 'aktif' => 'dashboard.saya'];
     $menu = array_filter([
-        $dasbor ? ['grup', 'grupDashboard', 'Dashboard', 'speedometer2', null, $admin || $peran->contains('warek2') ? $dasbor : [['dashboard', 'house', 'Ringkasan', 'aktif' => 'dashboard'], ...$dasbor]]
+        $dasbor ? ['grup', 'grupDashboard', 'Dashboard', 'speedometer2', null, \App\Support\Akses::dashboardPegawai() ? [$saya, ...$dasbor] : [['dashboard', 'house', 'Ringkasan', 'aktif' => 'dashboard'], ...$dasbor]]
             : ['dashboard', 'dashboard', 'speedometer2', 'Dashboard'],
         $admin ? ['grup', 'grupMaster', 'Master Data', 'database', null, [
             ['staff.index', 'people', 'Data Pegawai', 'aktif' => ['staff.index', 'staff.show', 'staff.create', 'staff.edit']],
@@ -107,6 +109,7 @@
     </nav>
     <div class="p-3 border-top border-secondary small">
         <div class="fw-semibold">{{ auth()->user()->name }}</div>
+        @if (auth()->user()->staff_id)<a href="{{ route('staff.show', auth()->user()->staff_id) }}" class="small text-white-50 text-decoration-none"><i class="bi bi-person-vcard me-1"></i>Profil Saya</a>@endif
         <div class="text-white-50 mb-2">{{ ['admin' => 'Admin HRD', 'dosen' => 'Dosen', 'staff' => 'Staf'][auth()->user()->peran] }}</div>
         <form method="post" action="{{ route('logout') }}" data-no-ajax>@csrf<button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right me-1"></i>Keluar</button></form>
     </div>

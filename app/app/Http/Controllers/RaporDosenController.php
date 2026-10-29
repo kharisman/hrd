@@ -15,6 +15,7 @@ use App\Models\Pejabat;
 use App\Models\Prodi;
 use App\Models\RiwayatPendidikan;
 use App\Models\Staff;
+use App\Support\Akses;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -26,8 +27,8 @@ class RaporDosenController extends Controller
     public function index(Request $r)
     {
         abort_unless($this->bolehSemua(), 403);
-        $prodi = in_array($r->prodi, Dosen::daftarProdi()) ? $r->prodi : null;
-        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Dosen::daftarProdi())->orderBy('nama')->get();
+        $prodi = Akses::bolehProdi($r->prodi) ? $r->prodi : (Akses::semuaProdi() ? null : Akses::prodiDosen()[0]);
+        $dosen = Dosen::where('aktif', true)->whereIn('program_studi', $prodi ? [$prodi] : Akses::prodiDosen())->orderBy('nama')->get();
         $jumlah = CapaianDosen::whereIn('dosen_id', $dosen->pluck('id'))->selectRaw('dosen_id, jenis, count(*) n')
             ->groupBy('dosen_id', 'jenis')->toBase()->get()->groupBy('dosen_id')->map(fn ($g) => $g->pluck('n', 'jenis'));
         $roadmap = CapaianDosen::whereIn('dosen_id', $dosen->pluck('id'))->where('jenis', 'roadmap')->get()->groupBy('dosen_id');
@@ -36,7 +37,7 @@ class RaporDosenController extends Controller
 
     public function show(Dosen $dosen)
     {
-        abort_unless($this->bolehSemua() || $this->milikSaya($dosen), 403);
+        abort_unless(Akses::bolehProdi($dosen->program_studi) || $this->milikSaya($dosen), 403);
         $dosen->load('staff');
         $staffId = Staff::utama($dosen->staff?->nip)?->id;
         $tahunKompetensi = Kompetensi::where('dosen_id', $dosen->id)->max('tahun');
@@ -109,9 +110,10 @@ class RaporDosenController extends Controller
         }, null, false);
     }
 
+    // Daftar rapor: admin, pimpinan, kaprodi (prodinya saja)
     private function bolehSemua(): bool
     {
-        return $this->isAdmin() || Pejabat::peranDari($this->myStaffIds())->contains('warek1');
+        return Akses::dashboardDosen();
     }
 
     private function milikSaya(Dosen $d): bool

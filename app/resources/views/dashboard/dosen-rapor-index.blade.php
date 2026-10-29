@@ -8,8 +8,8 @@
 @include('dashboard._tab-dosen')
 
 <ul class="nav nav-pills mb-3 small">
-    <li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen.rapor.index') }}">Semua Prodi</a></li>
-    @foreach (\App\Models\Dosen::daftarProdi() as $p)
+    @if (\App\Support\Akses::semuaProdi())<li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen.rapor.index') }}">Semua Prodi</a></li>@endif
+    @foreach (\App\Support\Akses::prodiDosen() as $p)
         <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen.rapor.index', ['prodi' => $p]) }}">{{ $p }}</a></li>
     @endforeach
 </ul>

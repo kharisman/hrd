@@ -32,6 +32,7 @@ class SinkronAkademik
         'mahasiswa' => ['Jumlah Mahasiswa Aktif (rasio)', '/mahasiswa', ['prodi', 'periode']],
         'dosen_pa' => ['Bimbingan Akademik (PA)', '/dosen-pa', ['pegawai_dosen']],
         'penguji' => ['Dosen Penguji', '/pkl-skripsi/penguji', ['pegawai_dosen']],
+        'role' => ['Role Pegawai', '/role-map, /api-users', ['pegawai_dosen']],
         'mengajar' => ['Kelas yang Diampu', '/krs/{id}/grup', ['pegawai_dosen', 'periode']],
         'bimbingan' => ['Bimbingan PKL / Proposal / Skripsi', '/pkl-skripsi/{jenis}/{idKRS}', ['pegawai_dosen', 'periode']],
         'tautan_mk' => ['Tautan MK Inti ke Kurikulum', '/kurikulum/{id}/detail', ['prodi', 'kurikulum', 'angkatan']],
@@ -58,6 +59,7 @@ class SinkronAkademik
             'mahasiswa' => $this->rasio($prodiS1()),
             'dosen_pa' => $this->dosenPa(),
             'penguji' => $this->penguji(),
+            'role' => $this->role(),
             'mengajar' => $this->mengajar(),
             'bimbingan' => $this->bimbingan(),
             'tautan_mk' => $this->tautkanMk($prodiS1()),
@@ -201,6 +203,27 @@ class SinkronAkademik
         $ids = collect($this->api->detail('/pkl-skripsi/penguji'))->pluck('idDosen');
         Dosen::whereNotIn('api_id', $ids)->update(['penguji' => false]);
         return Dosen::whereIn('api_id', $ids)->update(['penguji' => true]);
+    }
+
+    /**
+     * Role eUniversity per pegawai = peta role (divisi × level, tipe staff) + role yang ditugaskan langsung ke akunnya.
+     * Dipakai akses dashboard (rektor/warek/kaprodi) & alur persetujuan (warek1/warek2/baak).
+     */
+    private function role(): int
+    {
+        $peta = collect($this->api->ambilSemua(['/role-map'])['/role-map'])->where('tipe_user', 'staff');
+        $akun = collect($this->api->ambilSemua(['/api-users'])['/api-users'])->filter(fn ($u) => $u['username'])
+            ->mapWithKeys(fn ($u) => [strtolower($u['username']) => (array) $u['roles']]);
+        $n = 0;
+        foreach (\App\Models\Staff::all() as $s) {
+            $roles = $peta->filter(fn ($m) => $m['id_divisi'] == $s->id_divisi && $m['id_level'] == $s->id_level)->pluck('role')
+                ->merge($akun[strtolower((string) $s->username)] ?? [])->unique()->sort()->values()->all();
+            if ($roles !== ($s->roles ?? [])) {
+                $s->update(['roles' => $roles ?: null]);
+            }
+            $n += (bool) $roles;
+        }
+        return $n;
     }
 
     // Master divisi × level (pilihan & validasi divisi/level pegawai)

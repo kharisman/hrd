@@ -19,8 +19,8 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <ul class="nav nav-pills small">
-        <li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen.kompetensi', ['tahun' => $tahun]) }}">Semua Prodi</a></li>
-        @foreach (\App\Models\Dosen::daftarProdi() as $p)
+        @if (\App\Support\Akses::semuaProdi())<li class="nav-item"><a class="nav-link {{ !$prodi ? 'active' : '' }}" href="{{ route('dashboard.dosen.kompetensi', ['tahun' => $tahun]) }}">Semua Prodi</a></li>@endif
+        @foreach (\App\Support\Akses::prodiDosen() as $p)
             <li class="nav-item"><a class="nav-link {{ $prodi === $p ? 'active' : '' }}" href="{{ route('dashboard.dosen.kompetensi', ['prodi' => $p, 'tahun' => $tahun]) }}">{{ $p }}</a></li>
         @endforeach
     </ul>
