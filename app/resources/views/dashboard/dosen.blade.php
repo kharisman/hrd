@@ -59,6 +59,14 @@
     </div></div>
 </div>
 
+{{-- Pie seperti Excel: status jafung, status serdos, penempatan dosen --}}
+<div class="row g-3 mb-3">
+    <div class="col-lg-4">@include('dashboard._pie', ['judul' => 'Status Jafung Dosen', 'data' => collect(['Tepat waktu' => $ringkas['tepat'], 'Tidak tepat' => $ringkas['tidakTepat']])])</div>
+    <div class="col-lg-4">@include('dashboard._pie', ['judul' => 'Status Sertifikasi Dosen', 'data' => collect(['Sudah serdos' => $ringkas['serdos'], 'Eligible' => $ringkas['eligible'], 'Belum eligible' => $ringkas['nonEligible']])])</div>
+    <div class="col-lg-4">@include('dashboard._pie', ['judul' => 'Dosen ' . ($prodi ?? 'Semua Prodi') . ' · Prodi & Kampus', 'data' => $ringkas['penempatan'],
+        'catatan' => 'Dari status dosen dan divisi/level data pegawai yang tertaut.'])</div>
+</div>
+
 {{-- Rincian per dosen --}}
 <div class="card mb-3">
     <div class="card-header">Jafung & Serdos per Dosen <small class="text-muted">· {{ $dosen->count() }} dosen</small></div>

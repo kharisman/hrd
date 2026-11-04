@@ -37,7 +37,7 @@ class DashboardDosenController extends Controller
     public function __invoke(Request $r)
     {
         $prodi = $this->prodiDipilih($r, null);
-        $semua = Dosen::where('aktif', true)->whereIn('program_studi', Akses::prodiDosen())->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
+        $semua = Dosen::with('staff')->where('aktif', true)->whereIn('program_studi', Akses::prodiDosen())->orderBy('nama')->get()->map(fn ($d) => $this->nilaiDosen($d));
         $dosen = $prodi ? $semua->where('prodi', $prodi)->values() : $semua;
 
         return view('dashboard.dosen', [
@@ -177,6 +177,9 @@ class DashboardDosenController extends Controller
             'perSkill' => $skill->flatten()->groupBy(fn ($k) => $k->kelompok . '|' . $k->skill)
                 ->map(fn ($g) => ['sekarang' => round($g->avg('sekarang'), 1), 'target' => round($g->avg('target'), 1), 'n' => $g->count()]),
             'bolehUbah' => $this->isAdmin(),
+            // Pie "Jumlah Dosen Yang Mempunyai Sertifikat Kompetensi" (BNSP/LSP dari isian rapor)
+            'sertifikat' => collect(['Kompeten' => $n = \App\Models\CapaianDosen::whereIn('dosen_id', $dosen->pluck('id'))->where('jenis', 'sertifikat')
+                ->get()->filter->kompetensi->pluck('dosen_id')->unique()->count(), 'Belum' => $dosen->count() - $n]),
         ]);
     }
 
@@ -271,7 +274,21 @@ class DashboardDosenController extends Controller
             // Eligible serdos: minimal Asisten Ahli & 2 tahun sebagai dosen
             'eligibleSerdos' => !$d->serdos && $jenjang >= 1 && $masa >= 2,
             's3' => $d->pendidikan_terakhir === 'S3',
+            'penempatan' => $this->penempatan($d),
         ];
+    }
+
+    // Kategori pie "Dosen Prodi dan Kampus" (Excel), dari status dosen & divisi/level data pegawai yang tertaut.
+    // ponytail: ditebak dari divisi/level staff; tambah kolom penempatan di dosens bila HRD perlu mengisinya manual.
+    private function penempatan(Dosen $d): string
+    {
+        return match (true) {
+            in_array($d->status_dosen, ['Tidak Tetap', 'Luar Biasa']) => 'Dosen dipayungi / paruh waktu',
+            !$d->staff => 'Belum tertaut data pegawai',
+            (bool) preg_match('/rektor/i', (string) $d->staff->level) => 'Dosen Kampus (Manajemen)',
+            $d->staff->divisi === 'Akademik' => 'Dosen Prodi',
+            default => 'Dosen yang diperbantukan di divisi',
+        };
     }
 
     private function ringkas($dosen): array
@@ -285,6 +302,8 @@ class DashboardDosenController extends Controller
             'serdos' => $dosen->where('serdos', true)->count(),
             'eligible' => $dosen->where('eligibleSerdos', true)->count(),
             'nonEligible' => $dosen->where('serdos', false)->where('eligibleSerdos', false)->count(),
+            'penempatan' => collect(['Dosen Prodi', 'Dosen Kampus (Manajemen)', 'Dosen yang diperbantukan di divisi', 'Dosen dipayungi / paruh waktu', 'Belum tertaut data pegawai'])
+                ->mapWithKeys(fn ($k) => [$k => $dosen->where('penempatan', $k)->count()])->filter(),
             's2' => $dosen->where('s3', false)->count(),
             's3' => $dosen->where('s3', true)->count(),
             'pctSerdos' => round($dosen->where('serdos', true)->count() / $n * 100),

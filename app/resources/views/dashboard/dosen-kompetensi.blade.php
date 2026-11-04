@@ -91,7 +91,9 @@
         <div class="card-footer small text-muted">▲▼ = perubahan dibanding {{ $tahun - 1 }}. Dosen tanpa nilai belum dinilai tahun ini.</div>
     </div></div>
 
-    <div class="col-xl-4"><div class="card h-100">
+    <div class="col-xl-4 d-flex flex-column gap-3">
+    <div>@include('dashboard._pie', ['judul' => 'Jumlah Dosen Yang Mempunyai Sertifikat Kompetensi', 'data' => $sertifikat, 'catatan' => 'Sertifikat BNSP/LSP yang tercatat di Rapor Dosen.'])</div>
+    <div class="card flex-grow-1">
         <div class="card-header">Rata-rata per Skill</div>
         <div class="card-body">
             @forelse ($perSkill->sortBy('sekarang') as $kunci => $s)
@@ -105,6 +107,7 @@
             @endforelse
             <div class="small text-muted mt-2">Diurutkan dari yang terendah: kandidat pelatihan bersama.</div>
         </div>
-    </div></div>
+    </div>
+    </div>
 </div>
 @endsection
