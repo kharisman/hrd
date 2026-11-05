@@ -23,9 +23,9 @@ Route::get('validasi/{kode}', [PengajuanController::class, 'validasi'])->middlew
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     // Login NIP/NIDN + OTP Telegram
-    Route::post('login/otp', [OtpController::class, 'kirim'])->name('login.otp.kirim');
+    Route::post('login/otp', [OtpController::class, 'kirim'])->middleware('throttle:5,1')->name('login.otp.kirim');
     Route::get('login/otp', [OtpController::class, 'formKode'])->name('login.otp');
     Route::post('login/otp/verifikasi', [OtpController::class, 'verifikasi'])->middleware('throttle:10,1')->name('login.otp.verifikasi');
 });

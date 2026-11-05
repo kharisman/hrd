@@ -269,6 +269,7 @@ class PengajuanController extends Controller
     public function berkas(Pengajuan $pengajuan, string $key)
     {
         abort_unless($this->bolehLihat($pengajuan), 403);
+        abort_unless(collect($pengajuan->jenis->isian)->where('tipe', 'file')->pluck('key')->contains($key), 404);
         $path = $pengajuan->data[$key] ?? null;
         abort_unless($path && Storage::exists($path), 404);
         return Storage::response($path);
