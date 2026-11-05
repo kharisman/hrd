@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardDosenController;
 use App\Http\Controllers\DashboardPegawaiController;
 use App\Http\Controllers\DosenController;
 use App\Http\Controllers\JenisCutiController;
+use App\Http\Controllers\HariLiburController;
 use App\Http\Controllers\JenisPengajuanController;
 use App\Http\Controllers\PengajuanController;
 use App\Http\Controllers\LaporanController;
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
     Route::get('pengajuan/{pengajuan}/pdf', [PengajuanController::class, 'pdf'])->name('pengajuan.pdf');
     Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');
     Route::resource('jenis-cuti', JenisCutiController::class)->only('index', 'store', 'update');
+    Route::resource('hari-libur', HariLiburController::class)->only('index', 'store', 'destroy');
     Route::resource('jenis-pengajuan', JenisPengajuanController::class)->except('show', 'destroy');
 
 });

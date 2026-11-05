@@ -133,7 +133,8 @@
                     </tr>
                 @endforeach
             </table>
-            <div class="card-footer small text-muted">Jatah berlaku per tahun kalender dan tidak diakumulasi. Terpakai = disetujui + masih menunggu.</div>
+            <div class="card-footer small text-muted">Sesuai SOP: cuti tahunan 12 hari bagi pegawai yang sudah bekerja 12 bulan, diajukan selambat-lambatnya 6 hari kerja sebelumnya,
+                tidak diakumulasi ke tahun berikutnya, dipotong cuti bersama, dan tidak dapat digabung dengan libur Idul Fitri. Terpakai = disetujui + masih menunggu.</div>
         </div>
     @endif
 @endif

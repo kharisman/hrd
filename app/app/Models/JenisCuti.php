@@ -37,13 +37,16 @@ class JenisCuti extends Model
         // Jenis khusus satu jenis kelamin (mis. Melahirkan = P) hanya untuk pegawai itu; jenis kelamin kosong = semua jenis tampil
         $jk = Staff::whereIn('id', (array) $staffId)->whereNotNull('jenis_kelamin')->value('jenis_kelamin');
         return self::where('aktif', true)->when($jk, fn ($q) => $q->where(fn ($w) => $w->whereNull('jenis_kelamin')->orWhere('jenis_kelamin', $jk)))
-            ->orderBy('id')->get()->map(function ($j) use ($disetujui, $proses) {
-            $terpakai = (int) ($disetujui[$j->id] ?? 0) + (int) ($proses[$j->id] ?? 0);
+            ->orderBy('id')->get()->map(function ($j) use ($disetujui, $proses, $tahun) {
+            // SOP: cuti bersama (Kalender Libur) memotong jatah cuti tahunan
+            $bersama = $j->kuota && stripos($j->nama, 'tahunan') !== false ? HariLibur::cutiBersama($tahun ?? now()->year) : 0;
+            $terpakai = (int) ($disetujui[$j->id] ?? 0) + (int) ($proses[$j->id] ?? 0) + $bersama;
             return (object) [
                 'jenis' => $j,
                 'kuota' => $j->kuota,
                 'disetujui' => (int) ($disetujui[$j->id] ?? 0),
                 'proses' => (int) ($proses[$j->id] ?? 0),
+                'bersama' => $bersama,
                 'terpakai' => $terpakai,
                 'sisa' => $j->kuota === null ? null : max(0, $j->kuota - $terpakai),
             ];

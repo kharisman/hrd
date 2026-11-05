@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HariLibur;
 use App\Models\JenisCuti;
 use App\Models\JenisPengajuan;
 use App\Models\Pejabat;
@@ -119,6 +120,22 @@ class PengajuanController extends Controller
         $jatah = JenisCuti::rekap($this->myStaffIds()->all(), $tahun)[$d['jenis_cuti_id']] ?? null;
         if (!$jatah) {
             throw ValidationException::withMessages(['jenis_cuti_id' => 'Jenis cuti ini tidak berlaku untuk Anda.']);
+        }
+        // SOP Tata Cara Pengajuan Cuti: cuti tahunan baru berhak setelah 12 bulan bekerja, diajukan ≥ 6 hari kerja sebelumnya
+        if (stripos($jatah->jenis->nama, 'tahunan') !== false) {
+            $mulai = Carbon::parse($d['tgl_mulai']);
+            if ($staff->mulai_kerja && $staff->mulai_kerja->copy()->addMonths(12)->gt($mulai)) {
+                throw ValidationException::withMessages(['jenis_cuti_id' => 'Cuti tahunan berlaku setelah bekerja 12 bulan berturut-turut (mulai kerja ' . $staff->mulai_kerja->format('d/m/Y') . ').']);
+            }
+            if (HariLibur::hariKerja(today(), $mulai) < 6) {
+                throw ValidationException::withMessages(['tgl_mulai' => 'Cuti tahunan diajukan selambat-lambatnya 6 hari kerja sebelum tanggal mulai (hari libur tidak dihitung).']);
+            }
+            // ponytail: "digabung" = rentang cuti menyentuh libur Idul Fitri atau tepat sehari sebelum/sesudahnya
+            $idulFitri = HariLibur::where('nama', 'like', '%idul fitri%')
+                ->whereBetween('tanggal', [$mulai->copy()->subDay(), Carbon::parse($d['tgl_selesai'])->addDay()])->exists();
+            if ($idulFitri) {
+                throw ValidationException::withMessages(['tgl_mulai' => 'Cuti tahunan tidak dapat digabung dengan libur Idul Fitri.']);
+            }
         }
         $hari = Carbon::parse($d['tgl_mulai'])->diffInDays($d['tgl_selesai']) + 1;
         if ($jatah->sisa !== null && $hari > $jatah->sisa) {

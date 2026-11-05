@@ -15,7 +15,7 @@
         @else
             <div class="d-flex flex-wrap gap-4">
                 @foreach ($berkuota as $r)
-                    @php($a = min(360, $r->disetujui / $r->kuota * 360))
+                    @php($a = min(360, ($r->disetujui + ($r->bersama ?? 0)) / $r->kuota * 360))
                     @php($b = min(360, $a + $r->proses / $r->kuota * 360))
                     <div class="text-center" style="width:120px">
                         <div class="mx-auto rounded-circle position-relative" role="img"
@@ -28,7 +28,7 @@
                             </div>
                         </div>
                         <div class="small fw-semibold mt-2">{{ $r->jenis->nama }}</div>
-                        <div class="small text-muted">sisa hari{{ $r->proses ? " · {$r->proses} proses" : '' }}</div>
+                        <div class="small text-muted">sisa hari{{ $r->proses ? " · {$r->proses} proses" : '' }}{{ !empty($r->bersama) ? " · {$r->bersama} cuti bersama" : '' }}</div>
                     </div>
                 @endforeach
             </div>
