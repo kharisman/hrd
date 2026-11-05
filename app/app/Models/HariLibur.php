@@ -21,7 +21,11 @@ class HariLibur extends Model
     // Hari kerja di antara dua tanggal (Senin–Jumat, minus libur nasional & cuti bersama); $dari tidak ikut dihitung
     public static function hariKerja(Carbon $dari, Carbon $sampai): int
     {
-        $libur = self::whereBetween('tanggal', [$dari->copy()->addDay(), $sampai])->pluck('tanggal')->reject->isWeekend()->count();
-        return $dari->diffInWeekdays($sampai, false) - $libur;
+        if ($sampai->lte($dari)) {
+            return 0;
+        }
+        $libur = self::whereBetween('tanggal', [$dari->copy()->addDay()->toDateString(), $sampai->toDateString()])->pluck('tanggal')->map->toDateString();
+        return collect(\Carbon\CarbonPeriod::create($dari->copy()->addDay(), $sampai))
+            ->reject(fn ($t) => $t->isWeekend() || $libur->contains($t->toDateString()))->count();
     }
 }

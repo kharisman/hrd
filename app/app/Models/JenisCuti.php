@@ -9,7 +9,14 @@ class JenisCuti extends Model
     protected $connection = 'mysql';
     protected $table = 'jenis_cuti';
     protected $guarded = ['id'];
-    protected $casts = ['aktif' => 'boolean'];
+    protected $casts = ['aktif' => 'boolean', 'hari_kalender' => 'boolean'];
+
+    // Lama cuti: hari kerja (tanpa akhir pekan & Kalender Libur), kecuali jenis ber-hari kalender (mis. Melahirkan)
+    public function lama($mulai, $selesai): int
+    {
+        [$mulai, $selesai] = [\Carbon\Carbon::parse($mulai), \Carbon\Carbon::parse($selesai)];
+        return $this->hari_kalender ? $mulai->diffInDays($selesai) + 1 : HariLibur::hariKerja($mulai->copy()->subDay(), $selesai);
+    }
 
     public function pengajuan()
     {
@@ -28,7 +35,7 @@ class JenisCuti extends Model
     {
         // Hari cuti per jenis: disetujui & masih dalam proses persetujuan (keduanya mengurangi jatah)
         $hari = fn ($q) => $q->whereIn('staff_id', (array) $staffId)->whereYear('tgl_mulai', $tahun ?? now()->year)
-            ->selectRaw('jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari')->groupBy('jenis_cuti_id')
+            ->selectRaw('jenis_cuti_id, SUM(lama) hari')->groupBy('jenis_cuti_id')
             ->toBase() // tanpa model: kolom "hari" bentrok dengan accessor Pengajuan::getHariAttribute
             ->pluck('hari', 'jenis_cuti_id');
         $disetujui = $hari(Pengajuan::cuti()->where('status', 'Disetujui'));

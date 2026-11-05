@@ -35,7 +35,7 @@ class LaporanController extends Controller
         $jenis = JenisCuti::orderBy('id')->get();
         $status = $r->input('status', 'Disetujui');
         $hari = Pengajuan::cuti()->when($status === 'Menunggu', fn ($q) => $q->menunggu(), fn ($q) => $q->where('status', $status))->whereYear('tgl_mulai', $tahun)
-            ->selectRaw('staff_id, jenis_cuti_id, SUM(DATEDIFF(tgl_selesai, tgl_mulai) + 1) hari, COUNT(*) n')
+            ->selectRaw('staff_id, jenis_cuti_id, SUM(lama) hari, COUNT(*) n')
             ->groupBy('staff_id', 'jenis_cuti_id')->toBase()->get()->groupBy('staff_id');
 
         $baris = Staff::whereIn('id', $hari->keys())

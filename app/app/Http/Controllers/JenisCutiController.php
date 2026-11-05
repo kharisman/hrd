@@ -42,6 +42,6 @@ class JenisCutiController extends Controller
             'kuota' => 'nullable|integer|min:1|max:366',
             'jenis_kelamin' => 'nullable|in:L,P',
             'keterangan' => 'nullable|string|max:255',
-        ]) + ['aktif' => $request->boolean('aktif')];
+        ]) + ['aktif' => $request->boolean('aktif'), 'hari_kalender' => $request->boolean('hari_kalender')];
     }
 }

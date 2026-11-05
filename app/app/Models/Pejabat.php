@@ -11,7 +11,7 @@ class Pejabat extends Model
     protected $table = 'pejabat';
     protected $guarded = ['id'];
 
-    const PERAN = ['warek1' => 'Warek I', 'warek2' => 'Warek II', 'keuangan' => 'Keuangan', 'baak' => 'BAAK'];
+    const PERAN = ['rektor' => 'Rektor', 'warek1' => 'Warek I', 'warek2' => 'Warek II', 'keuangan' => 'Keuangan', 'baak' => 'BAAK'];
 
     public function staff()
     {
@@ -25,8 +25,10 @@ class Pejabat extends Model
     public static function peranDari($staffIds)
     {
         $roles = Staff::whereIn('id', $staffIds)->where('aktif', true)->pluck('roles')->flatten()->filter();
+        // Penandatangan dokumen (Pengaturan → Dokumen, default pegawai level Rektor) otomatis memegang peran Rektor
+        $rektor = collect($staffIds)->contains(Pengaturan::penandatangan()?->id) ? ['rektor'] : [];
         return static::whereIn('staff_id', $staffIds)->pluck('peran')
-            ->merge($roles->intersect(self::DARI_ROLE))->unique()->values();
+            ->merge($roles->intersect(self::DARI_ROLE))->merge($rektor)->unique()->values();
     }
 
     // Pemegang peran dari role eUniversity (untuk ditampilkan di Pengaturan → Peran Pejabat)

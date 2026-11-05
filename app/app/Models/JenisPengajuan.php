@@ -25,7 +25,12 @@ class JenisPengajuan extends Model
     // No. HP terkini dari NIP di ujung teks pilihan
     public static function hpPegawai(?string $teks): ?string
     {
-        return $teks ? Staff::utama(trim(\Illuminate\Support\Str::afterLast($teks, '·')))?->no_hp : null;
+        return ($nip = self::nipPegawai($teks)) ? Staff::utama($nip)?->no_hp : null;
+    }
+
+    public static function nipPegawai(?string $teks): ?string
+    {
+        return $teks ? trim(\Illuminate\Support\Str::afterLast($teks, '·')) ?: null : null;
     }
     const KATEGORI = ['Kehadiran & Waktu Kerja', 'Data & Dokumen', 'Pengembangan Karier', 'Keuangan & Kesejahteraan', 'Hubungan Kerja', 'Lainnya'];
 

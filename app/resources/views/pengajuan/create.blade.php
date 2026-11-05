@@ -134,7 +134,7 @@
                 @endforeach
             </table>
             <div class="card-footer small text-muted">Sesuai SOP: cuti tahunan 12 hari bagi pegawai yang sudah bekerja 12 bulan, diajukan selambat-lambatnya 6 hari kerja sebelumnya,
-                tidak diakumulasi ke tahun berikutnya, dipotong cuti bersama, dan tidak dapat digabung dengan libur Idul Fitri. Terpakai = disetujui + masih menunggu.</div>
+                tidak diakumulasi ke tahun berikutnya, dipotong cuti bersama, dan tidak dapat digabung dengan libur Idul Fitri. Lama cuti dihitung hari kerja (kecuali Cuti Melahirkan). Alur: Atasan → HRD → Rektor. Terpakai = disetujui + masih menunggu.</div>
         </div>
     @endif
 @endif

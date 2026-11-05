@@ -94,6 +94,9 @@ Route::middleware('auth')->group(function () {
     Route::get('pengajuan/{pengajuan}/pdf', [PengajuanController::class, 'pdf'])->name('pengajuan.pdf');
     Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');
     Route::resource('jenis-cuti', JenisCutiController::class)->only('index', 'store', 'update');
+    Route::delete('hari-libur/reset/{tahun}', [HariLiburController::class, 'reset'])->whereNumber('tahun')->name('hari-libur.reset');
+    Route::post('hari-libur/impor', [HariLiburController::class, 'impor'])->name('hari-libur.impor');
+    Route::get('hari-libur/template', [HariLiburController::class, 'template'])->name('hari-libur.template');
     Route::resource('hari-libur', HariLiburController::class)->only('index', 'store', 'destroy');
     Route::resource('jenis-pengajuan', JenisPengajuanController::class)->except('show', 'destroy');
 

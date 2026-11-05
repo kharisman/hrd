@@ -137,11 +137,26 @@ class PengajuanController extends Controller
                 throw ValidationException::withMessages(['tgl_mulai' => 'Cuti tahunan tidak dapat digabung dengan libur Idul Fitri.']);
             }
         }
-        $hari = Carbon::parse($d['tgl_mulai'])->diffInDays($d['tgl_selesai']) + 1;
+        $hari = $d['lama'] = $jatah->jenis->lama($d['tgl_mulai'], $d['tgl_selesai']);
+        if ($hari < 1) {
+            throw ValidationException::withMessages(['tgl_selesai' => 'Rentang tanggal hanya berisi akhir pekan / hari libur.']);
+        }
+        $this->cekPengganti($r->input('isian.pengganti'), $d['tgl_mulai'], $d['tgl_selesai']);
         if ($jatah->sisa !== null && $hari > $jatah->sisa) {
             throw ValidationException::withMessages(['tgl_selesai' => "Melebihi jatah {$jatah->jenis->nama} {$tahun}: diajukan {$hari} hari, sisa {$jatah->sisa} dari {$jatah->kuota} hari."]);
         }
         return $d;
+    }
+
+    // Pegawai pengganti tidak boleh sedang cuti (disetujui / masih diproses) di rentang yang sama
+    private function cekPengganti(?string $pengganti, $mulai, $selesai): void
+    {
+        $hp = JenisPengajuan::nipPegawai($pengganti);
+        $bentrok = $hp ? Pengajuan::cuti()->whereIn('staff_id', Staff::where('nip', $hp)->pluck('id'))
+            ->whereNotIn('status', ['Ditolak', 'Dibatalkan'])->where('tgl_mulai', '<=', $selesai)->where('tgl_selesai', '>=', $mulai)->first() : null;
+        if ($bentrok) {
+            throw ValidationException::withMessages(['isian.pengganti' => 'Pegawai pengganti sedang cuti ' . $bentrok->tgl_mulai->format('d/m') . '–' . $bentrok->tgl_selesai->format('d/m') . '. Pilih pegawai lain.']);
+        }
     }
 
     public function show(Pengajuan $pengajuan)
@@ -156,7 +171,22 @@ class PengajuanController extends Controller
     {
         $tahap = $this->tahapProses($pengajuan);
         abort_unless($tahap, 403, 'Anda tidak berwenang memproses pengajuan ini, atau pengajuan sudah diproses.');
-        $d = $r->validate(['keputusan' => 'required|in:setujui,tolak', 'catatan' => 'nullable|string|max:2000']);
+        $d = $r->validate(['keputusan' => 'required|in:setujui,tolak', 'catatan' => 'nullable|string|max:2000',
+            'tgl_mulai' => 'nullable|date', 'tgl_selesai' => 'nullable|date|after_or_equal:tgl_mulai', 'lama' => 'nullable|integer|min:1|max:366']);
+
+        // SOP: pemutus boleh menjadwal ulang (tanggal) & HRD mengoreksi lama cuti; perubahan dicatat di catatan
+        if ($pengajuan->jenis_cuti_id && $d['keputusan'] === 'setujui') {
+            $mulai = $d['tgl_mulai'] ?? $pengajuan->tgl_mulai->toDateString();
+            $selesai = $d['tgl_selesai'] ?? $pengajuan->tgl_selesai->toDateString();
+            $geser = $mulai !== $pengajuan->tgl_mulai->toDateString() || $selesai !== $pengajuan->tgl_selesai->toDateString();
+            $lama = $tahap === 'hrd' && !empty($d['lama']) ? (int) $d['lama'] : ($geser ? $pengajuan->jenisCuti->lama($mulai, $selesai) : $pengajuan->lama);
+            if ($geser || $lama !== $pengajuan->lama) {
+                $ubah = ($geser ? 'Dijadwal ulang ' . Carbon::parse($mulai)->format('d/m/Y') . '–' . Carbon::parse($selesai)->format('d/m/Y') . '. ' : '')
+                    . ($lama !== $pengajuan->lama ? "Lama {$pengajuan->lama} → {$lama} hari." : '');
+                $pengajuan->update(['tgl_mulai' => $mulai, 'tgl_selesai' => $selesai, 'lama' => $lama]);
+                $d['catatan'] = trim($ubah . ' ' . ($d['catatan'] ?? ''));
+            }
+        }
 
         $pengajuan->putuskan($d['keputusan'] === 'setujui', auth()->user()->name, $d['catatan'] ?? null);
         return back()->with('ok', "Pengajuan {$pengajuan->status}." . ($pengajuan->nomor ? " Nomor: {$pengajuan->nomor}" : ''));

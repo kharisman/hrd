@@ -84,6 +84,19 @@
             <form method="post" action="{{ route('pengajuan.proses', $p) }}" class="card"><div class="card-body">
                 @csrf
                 <h6>Proses sebagai {{ \App\Models\JenisPengajuan::TAHAP[$tahap] }}</h6>
+                @if ($p->jenis_cuti_id)
+                    {{-- SOP: jadwal ulang bila kebutuhan institusi; HRD boleh mengoreksi lama cuti --}}
+                    <details class="mb-2 small"><summary class="text-primary">Jadwal ulang / koreksi lama cuti</summary>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6"><label class="form-label small mb-0">Mulai</label><input type="date" name="tgl_mulai" value="{{ $p->tgl_mulai->toDateString() }}" class="form-control form-control-sm"></div>
+                            <div class="col-6"><label class="form-label small mb-0">Selesai</label><input type="date" name="tgl_selesai" value="{{ $p->tgl_selesai->toDateString() }}" class="form-control form-control-sm"></div>
+                            @if ($tahap === 'hrd')
+                                <div class="col-6"><label class="form-label small mb-0">Lama (hari)</label><input type="number" min="1" name="lama" value="{{ $p->hari }}" class="form-control form-control-sm"></div>
+                            @endif
+                        </div>
+                        <div class="form-text">Berlaku saat <strong>Setujui</strong> dan tercatat di riwayat. Lama dihitung ulang otomatis bila tanggal diubah.</div>
+                    </details>
+                @endif
                 <textarea name="catatan" rows="2" class="form-control mb-2" placeholder="Catatan (opsional)"></textarea>
                 <div class="d-flex gap-2">
                     <button name="keputusan" value="setujui" class="btn btn-success flex-fill"><i class="bi bi-check-lg me-1"></i>Setujui</button>

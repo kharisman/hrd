@@ -75,7 +75,7 @@ class Pengajuan extends Model
 
     public function getHariAttribute(): ?int
     {
-        return $this->tgl_mulai ? $this->tgl_mulai->diffInDays($this->tgl_selesai) + 1 : null;
+        return $this->tgl_mulai ? ($this->lama ?? $this->tgl_mulai->diffInDays($this->tgl_selesai) + 1) : null;
     }
 
     // Nama yang boleh ditampilkan: anonim disembunyikan dari selain pengaju sendiri
