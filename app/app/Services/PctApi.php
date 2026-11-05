@@ -92,6 +92,23 @@ class PctApi
         return $res->successful() || $res->status() === 409 ? ($res->json('data') ?? []) : $this->galat($res) + ['status' => $res->status()];
     }
 
+    /**
+     * Status Telegram per username (GET /notifikasi/terhubung, maks. 50 per permintaan) → [username => bool].
+     * ponytail: di-cache 6 jam; pegawai yang baru menekan Start baru terlihat setelah cache habis
+     */
+    public function terhubung(array $username): array
+    {
+        $hasil = [];
+        foreach (array_chunk(array_values(array_unique(array_filter($username))), 50) as $bagian) {
+            $kunci = 'tg_terhubung_' . md5(implode(',', $bagian));
+            $hasil += \Illuminate\Support\Facades\Cache::remember($kunci, now()->addHours(6), fn () => collect(
+                $this->http(\Illuminate\Support\Facades\Cache::remember('pct_token_aplikasi', now()->addMinutes(50), fn () => $this->tokenAplikasi()), 1)
+                    ->get('/notifikasi/terhubung', ['username' => implode(',', $bagian)])->throw()->json('data'))
+                ->mapWithKeys(fn ($r) => [$r['username'] => (bool) $r['terhubung']])->all());
+        }
+        return $hasil;
+    }
+
     private function galat($res): array
     {
         if ($res->serverError()) {

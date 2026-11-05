@@ -13,7 +13,7 @@ class Pengajuan extends Model
     protected $table = 'pengajuan';
     protected $guarded = ['id'];
     protected $casts = ['data' => 'array', 'anonim' => 'boolean', 'tahapan' => 'array', 'riwayat' => 'array',
-        'disetujui_at' => 'datetime', 'penandatangan' => 'array', 'tgl_mulai' => 'date', 'tgl_selesai' => 'date'];
+        'disetujui_at' => 'datetime', 'penandatangan' => 'array', 'tgl_mulai' => 'date', 'tgl_selesai' => 'date', 'notifikasi' => 'array'];
 
     const SELESAI = ['Disetujui', 'Ditolak', 'Dibatalkan'];
 
@@ -132,12 +132,15 @@ class Pengajuan extends Model
         return self::usernamePegawai($ids)->diff(self::usernamePegawai([$this->staff_id]))->values();
     }
 
-    // Semua username milik pegawai ini (akun HRD & master staff ber-NIP sama)
+    // Satu username per pegawai (supaya tidak dapat pesan ganda): akun HRD yang terakhir login, kalau belum pernah login
+    // username master staff utama (Staff::utama) dari NIP yang sama
     private static function usernamePegawai($staffIds)
     {
-        $nip = Staff::whereIn('id', $staffIds)->pluck('nip')->filter();
-        $ids = Staff::whereIn('nip', $nip)->pluck('id')->merge($staffIds);
-        return Akun::whereIn('staff_id', $ids)->pluck('username')->merge(Staff::whereIn('id', $ids)->pluck('username'))->filter()->unique();
+        return Staff::whereIn('id', $staffIds)->get()->map(function ($s) {
+            $ids = $s->nip ? Staff::where('nip', $s->nip)->pluck('id') : collect([$s->id]);
+            return Akun::whereIn('staff_id', $ids)->orderByDesc('last_login_at')->value('username')
+                ?? ($s->nip ? Staff::utama($s->nip)?->username : null) ?? $s->username;
+        })->filter()->unique()->values();
     }
 
     // Notifikasi Telegram: pemutus tahap berikutnya, atau pengaju bila sudah selesai (disetujui / ditolak)
@@ -147,14 +150,23 @@ class Pengajuan extends Model
         $judul = e($this->jenis->nama ?? 'Pengajuan') . ($this->jenis_cuti_id ? ' (' . e($this->jenisCuti->nama ?? '') . ', ' . $this->tgl_mulai->format('d/m/Y') . ' – ' . $this->tgl_selesai->format('d/m/Y') . ", {$this->hari} hari)" : '');
         if ($this->selesai()) {
             $catatan = collect($this->riwayat)->last()['catatan'] ?? null;
-            \App\Services\Telegram::kirim(self::usernamePegawai([$this->staff_id]),
+            $hasil = \App\Services\Telegram::kirim($kepada = self::usernamePegawai([$this->staff_id]),
                 ($this->status === 'Disetujui' ? '✅' : '❌') . " {$judul} <b>{$this->status}</b>" . ($this->nomor ? "\nNomor: {$this->nomor}" : '')
                 . ($catatan ? "\nCatatan: " . e($catatan) : ''), $tautan('Lihat pengajuan'), "hrd-pengajuan-{$this->id}-selesai");
+            $untuk = 'Pengaju';
         } else {
-            \App\Services\Telegram::kirim($this->penerimaTahap(),
+            $hasil = \App\Services\Telegram::kirim($kepada = $this->penerimaTahap(),
                 "📝 {$judul} dari <b>" . e($this->namaPengaju()) . "</b> menunggu persetujuan Anda ({$this->status}).",
                 $tautan('Proses sekarang'), "hrd-pengajuan-{$this->id}-tahap-{$this->tahap_ke}");
+            $untuk = JenisPengajuan::TAHAP[$this->tahapSekarang()] ?? $this->tahapSekarang();
         }
+        // Log kiriman (id API untuk dilacak lewat GET /notifikasi/{id}); null = tidak dikirim (API tak terjangkau / tanpa penerima)
+        $this->updateQuietly(['notifikasi' => [...($this->notifikasi ?? []), [
+            'untuk' => $untuk, 'at' => now()->toDateTimeString(), 'kepada' => collect($kepada)->values()->all(),
+            'id' => $hasil['id'] ?? null, 'terkirim' => $hasil['terkirim'] ?? [],
+            'dilewati' => collect($hasil['dilewati'] ?? [])->merge($hasil['gagal'] ?? [])->all(),
+            'error' => $hasil === null ? 'tidak terkirim' : ($hasil['pesan'] ?? $hasil['error'] ?? null),
+        ]]]);
     }
 
     // "Laporan Capaian Dosen" disetujui → masuk rapor dosen pengaju (satu pengajuan = satu capaian)

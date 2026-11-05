@@ -79,6 +79,26 @@
             </ul>
         </div>
 
+        @if ($p->notifikasi)
+            <div class="card">
+                <div class="card-header"><i class="bi bi-telegram me-1"></i>Notifikasi Telegram</div>
+                <ul class="list-group list-group-flush small">
+                    @foreach ($p->notifikasi as $n)
+                        <li class="list-group-item">
+                            @if (!empty($n['error']))<i class="bi bi-exclamation-triangle text-danger me-1"></i>
+                            @elseif (!empty($n['dilewati']))<i class="bi bi-exclamation-circle text-warning me-1"></i>
+                            @else<i class="bi bi-check2-all text-success me-1"></i>@endif
+                            Ke {{ $n['untuk'] }} · {{ \Illuminate\Support\Carbon::parse($n['at'])->diffForHumans() }}
+                            @if ($n['terkirim'])<div class="text-muted ms-3">Terkirim: {{ implode(', ', $n['terkirim']) }}</div>@endif
+                            @foreach ($n['dilewati'] as $d)<div class="text-warning-emphasis ms-3">{{ $d['penerima'] ?? '?' }}: {{ str_replace('_', ' ', $d['alasan'] ?? 'gagal') }}</div>@endforeach
+                            @if (!empty($n['error']))<div class="text-danger ms-3">{{ $n['error'] }}{{ $n['kepada'] ? '' : ' (tidak ada penerima)' }}</div>@endif
+                            @if (!empty($n['id']))<div class="text-muted ms-3"><code class="small">{{ $n['id'] }}</code></div>@endif
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         {{-- Tombol proses untuk pemutus tahap yang sedang berjalan --}}
         @if ($tahap)
             <form method="post" action="{{ route('pengajuan.proses', $p) }}" class="card"><div class="card-body">

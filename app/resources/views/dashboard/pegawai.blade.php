@@ -27,6 +27,14 @@
     </div>
 </div>
 
+{{-- Pengingat Telegram (notifikasi pengajuan); API tidak terjangkau -> tidak tampil --}}
+@if (rescue(fn () => app(\App\Services\PctApi::class)->terhubung([$akun->username])[$akun->username] ?? true, true, false) === false)
+    <div class="alert alert-warning small d-flex gap-2 align-items-center">
+        <i class="bi bi-telegram fs-5"></i>
+        <div>Telegram Anda belum terhubung, jadi notifikasi pengajuan (persetujuan, hasil cuti) tidak terkirim. Tekan <strong>Start</strong> di bot eUniversity, lalu hubungi admin.</div>
+    </div>
+@endif
+
 @if ($pengajuanBawahan)
 <div class="alert alert-warning d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bell me-1"></i> <strong>{{ $pengajuanBawahan }}</strong> pengajuan (cuti, dinas luar, reimburse, dll.) menunggu persetujuan Anda.</span>

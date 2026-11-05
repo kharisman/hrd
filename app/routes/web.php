@@ -85,6 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::post('pejabat', 'tambahPejabat')->name('pejabat.tambah');
         Route::delete('pejabat/{pejabat}', 'hapusPejabat')->name('pejabat.hapus');
         Route::get('api', 'api')->name('api');
+        Route::get('kelengkapan', \App\Http\Controllers\KelengkapanController::class)->name('kelengkapan');
         Route::post('api/cek', 'cekApi')->name('api.cek');
     });
 
