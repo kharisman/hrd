@@ -6,7 +6,8 @@ use App\Models\Akun;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-// Bot Telegram untuk notifikasi. Tanpa TELEGRAM_BOT_TOKEN semua kiriman diam-diam dilewati.
+// Bot Telegram untuk notifikasi; chat ID penerima = akuns.telegram_chat_id (dari GET /telegram eUniversity saat sinkron/login).
+// Tanpa TELEGRAM_BOT_TOKEN semua kiriman diam-diam dilewati.
 // ponytail: kirim sinkron (timeout 5 dtk), pindah ke queue bila penerima banyak / bot lambat
 class Telegram
 {

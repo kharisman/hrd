@@ -29,6 +29,23 @@ class Akun extends Authenticatable
     }
 
     /**
+     * Chat ID Telegram per username (huruf kecil) dari GET /telegram eUniversity — pendaftaran Telegram terpusat di sana.
+     * Disimpan di cache supaya login bisa langsung mengisi tanpa memanggil API. Gagal → null (data lama dipertahankan).
+     */
+    public static function chatTelegram(?\App\Services\PctApi $api = null): ?array
+    {
+        if (!$api) {
+            return \Illuminate\Support\Facades\Cache::get('telegram_chat');
+        }
+        $peta = rescue(fn () => collect($api->ambilSemua(['/telegram'])['/telegram'])->where('StatusLogin', 'aktif')
+            ->mapWithKeys(fn ($r) => [strtolower($r['username']) => (string) $r['chat_id']])->all(), null, false);
+        if ($peta !== null) {
+            \Illuminate\Support\Facades\Cache::forever('telegram_chat', $peta);
+        }
+        return $peta;
+    }
+
+    /**
      * Tautan akun login → [Staff|null, Dosen|null]. Username akun dosen eUniversity sering beda dengan username
      * master staff (mis. tri_octavian vs octafian), jadi cadangannya: NIP akun, lalu pegawai yang tertaut ke dosennya.
      */

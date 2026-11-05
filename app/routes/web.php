@@ -88,16 +88,6 @@ Route::middleware('auth')->group(function () {
         Route::post('api/cek', 'cekApi')->name('api.cek');
     });
 
-    // Tautkan akun ke bot Telegram: kode sekali pakai → t.me/<bot>?start=<kode>, diambil oleh "php artisan telegram:tarik"
-    Route::get('telegram/hubungkan', function () {
-        abort_unless(config('services.telegram.username'), 404, 'Bot Telegram belum diatur.');
-        auth()->user()->update(['telegram_kode' => $kode = \Illuminate\Support\Str::random(24)]);
-        return redirect()->away('https://t.me/' . config('services.telegram.username') . '?start=' . $kode);
-    })->name('telegram.hubungkan');
-    Route::post('telegram/putus', function () {
-        auth()->user()->update(['telegram_chat_id' => null, 'telegram_kode' => null]);
-        return back()->with('ok', 'Notifikasi Telegram dimatikan.');
-    })->name('telegram.putus');
     Route::resource('pengajuan', PengajuanController::class)->only('index', 'create', 'store', 'show');
     Route::post('pengajuan/{pengajuan}/proses', [PengajuanController::class, 'proses'])->name('pengajuan.proses');
     Route::post('pengajuan/{pengajuan}/batal', [PengajuanController::class, 'batal'])->name('pengajuan.batal');

@@ -134,11 +134,14 @@ class Sinkron
             $stat['dosen_tertaut_pegawai'] = Dosen::whereNotNull('staff_id')->count();
             $stat['staff_aktif'] = Staff::aktif()->count();
 
-            // 3. Akun yang pernah login: perbarui tautan ke pegawai & dosen (Akun::tautan)
+            // 3. Akun yang pernah login: perbarui tautan ke pegawai & dosen (Akun::tautan) + chat ID Telegram dari eUniversity
+            $telegram = Akun::chatTelegram($this->api);
             foreach (Akun::all() as $akun) {
                 [$staff, $dosen] = Akun::tautan($akun->username, $akun->nip);
-                $akun->update(['staff_id' => $staff?->id, 'dosen_id' => $dosen?->id]);
+                $akun->update(['staff_id' => $staff?->id, 'dosen_id' => $dosen?->id]
+                    + ($telegram ? ['telegram_chat_id' => $telegram[strtolower($akun->username)] ?? null] : []));
             }
+            $stat['akun_telegram'] = Akun::whereNotNull('telegram_chat_id')->count();
         });
 
         return $stat;
