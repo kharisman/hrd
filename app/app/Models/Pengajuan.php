@@ -112,6 +112,45 @@ class Pengajuan extends Model
             $this->sahkan();
             $this->jadikanCapaian();
         }
+        $this->kabari();
+    }
+
+    // Akun yang memutus tahap sekarang (semua akun ber-NIP sama dengan pemegangnya)
+    public function penerimaTahap()
+    {
+        $tahap = $this->tahapSekarang();
+        if (!$tahap) {
+            return collect();
+        }
+        if ($tahap === 'hrd') {
+            return Akun::where('peran', 'admin')->get();
+        }
+        $ids = $tahap === 'atasan' ? collect([$this->staff?->atasan_id])
+            : Pejabat::where('peran', $tahap)->pluck('staff_id')->merge(Pejabat::dariRole($tahap)->pluck('id'))
+                ->when($tahap === 'rektor', fn ($c) => $c->push(Pengaturan::penandatangan()?->id));
+        $nip = Staff::whereIn('id', $ids->filter())->pluck('nip')->filter();
+        return Akun::whereIn('staff_id', Staff::whereIn('nip', $nip)->pluck('id')->merge($ids->filter()))
+            ->where(fn ($q) => $q->whereNull('staff_id')->orWhereNotIn('staff_id', [$this->staff_id]))->get();
+    }
+
+    // Notifikasi Telegram: pemutus tahap berikutnya, atau pengaju bila sudah selesai (disetujui / ditolak)
+    public function kabari(): void
+    {
+        $url = route('pengajuan.show', $this);
+        $judul = e($this->jenis->nama ?? 'Pengajuan') . ($this->jenis_cuti_id ? ' (' . e($this->jenisCuti->nama ?? '') . ', ' . $this->tgl_mulai->format('d/m/Y') . ' – ' . $this->tgl_selesai->format('d/m/Y') . ", {$this->hari} hari)" : '');
+        if ($this->selesai()) {
+            $catatan = collect($this->riwayat)->last()['catatan'] ?? null;
+            \App\Services\Telegram::kirim(Akun::where('staff_id', $this->staff_id)->get(),
+                ($this->status === 'Disetujui' ? '✅' : '❌') . " {$judul} <b>{$this->status}</b>" . ($this->nomor ? "
+Nomor: {$this->nomor}" : '')
+                . ($catatan ? "
+Catatan: " . e($catatan) : '') . "
+<a href=\"{$url}\">Lihat pengajuan</a>");
+        } else {
+            \App\Services\Telegram::kirim($this->penerimaTahap(),
+                "📝 {$judul} dari <b>" . e($this->namaPengaju()) . "</b> menunggu persetujuan Anda ({$this->status}).
+<a href=\"{$url}\">Proses sekarang</a>");
+        }
     }
 
     // "Laporan Capaian Dosen" disetujui → masuk rapor dosen pengaju (satu pengajuan = satu capaian)

@@ -16,6 +16,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // Butuh cron server: * * * * * php artisan schedule:run
+        $schedule->command('telegram:tarik')->everyMinute()->withoutOverlapping();
         $schedule->command('hrd:sync')->dailyAt('02:00')->withoutOverlapping();
     }
 

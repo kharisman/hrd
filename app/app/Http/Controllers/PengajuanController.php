@@ -104,6 +104,7 @@ class PengajuanController extends Controller
             'jenis_pengajuan_id' => $jenis->id, 'staff_id' => $staff->id, 'anonim' => $anonim,
             'data' => $data,
         ] + Pengajuan::alurAwal($jenis, $staff, $anonim));
+        $p->kabari();
         return redirect()->route('pengajuan.show', $p)->with('ok', "Pengajuan {$jenis->nama} dikirim ({$p->status}).");
     }
 

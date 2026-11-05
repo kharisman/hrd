@@ -2,6 +2,14 @@
 @section('title', 'Pengajuan')
 
 @section('actions')
+    @if (config('services.telegram.username'))
+        @if (auth()->user()->telegram_chat_id)
+            <form method="post" action="{{ route('telegram.putus') }}" class="d-inline" onsubmit="return confirm('Matikan notifikasi Telegram?')">@csrf
+                <button class="btn btn-outline-success" title="Notifikasi Telegram aktif — klik untuk mematikan"><i class="bi bi-telegram me-1"></i>Telegram aktif</button></form>
+        @else
+            <a href="{{ route('telegram.hubungkan') }}" target="_blank" class="btn btn-outline-primary" title="Buka bot, tekan Start; tautan aktif ±1 menit kemudian"><i class="bi bi-telegram me-1"></i>Hubungkan Telegram</a>
+        @endif
+    @endif
     <a href="{{ route('pengajuan.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Buat Pengajuan</a>
 @endsection
 

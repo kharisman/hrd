@@ -60,6 +60,12 @@ return [
         'site_name' => env('OPENROUTER_SITE_NAME'),
     ],
 
+    // Bot notifikasi (buat lewat @BotFather); TELEGRAM_BOT_USERNAME tanpa @
+    'telegram' => [
+        'token' => env('TELEGRAM_BOT_TOKEN'),
+        'username' => env('TELEGRAM_BOT_USERNAME'),
+    ],
+
     'deepseek' => [
         'key' => env('DEEPSEEK_API_KEY'),
         'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
