@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Akun;
 use App\Models\HariLibur;
 use App\Models\JenisCuti;
 use App\Models\JenisPengajuan;
@@ -164,7 +165,10 @@ class PengajuanController extends Controller
     {
         abort_unless($this->bolehLihat($pengajuan), 403);
         $pengajuan->load('jenis', 'jenisCuti', 'staff.atasan');
-        return view('pengajuan.show', ['p' => $pengajuan, 'me' => $this->myStaffId(), 'tahap' => $this->tahapProses($pengajuan)]);
+        return view('pengajuan.show', ['p' => $pengajuan, 'me' => $this->myStaffId(), 'tahap' => $this->tahapProses($pengajuan), 'bolehBatal' => $this->bolehBatal($pengajuan),
+            'bolehLihatSendiri' => $sendiri = $this->myStaffIds()->contains($pengajuan->staff_id),
+            'pemutusLain' => $sendiri && !$pengajuan->selesai() ? Akun::whereIn('username', $lain = $pengajuan->penerimaTahap()->diff(Akun::whereIn('staff_id', $this->myStaffIds())->pluck('username')))->pluck('name')
+                ->merge(Staff::whereIn('username', $lain)->whereNotIn('id', $this->myStaffIds())->pluck('nama'))->unique()->implode(', ') : null]);
     }
 
     // Setujui / tolak oleh atasan (tahap 1) atau HRD (tahap akhir)
@@ -196,9 +200,15 @@ class PengajuanController extends Controller
     // Pengaju membatalkan selama belum selesai diproses
     public function batal(Pengajuan $pengajuan)
     {
-        abort_unless($this->myStaffIds()->contains($pengajuan->staff_id) && !$pengajuan->selesai(), 403);
+        abort_unless($this->bolehBatal($pengajuan), 403, 'Pengajuan yang sudah diproses atasan/pemutus tidak bisa dibatalkan.');
         $pengajuan->update(['status' => 'Dibatalkan']);
         return back()->with('ok', 'Pengajuan dibatalkan.');
+    }
+
+    // Pengaju (akun mana pun ber-NIP sama) boleh membatalkan selama belum ada keputusan di tahap mana pun
+    private function bolehBatal(Pengajuan $p): bool
+    {
+        return $this->myStaffIds()->contains($p->staff_id) && !$p->selesai() && empty($p->riwayat);
     }
 
     // PDF pengajuan. Disetujui → tanda tangan pejabat Rektor berupa QR menuju halaman validasi publik.

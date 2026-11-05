@@ -7,8 +7,8 @@
 @section('actions')
     <a href="{{ route('pengajuan.pdf', $p) }}" target="_blank" class="btn {{ $p->status === 'Disetujui' ? 'btn-success' : 'btn-outline-secondary' }}">
         <i class="bi bi-file-earmark-pdf me-1"></i>{{ $p->status === 'Disetujui' ? 'Unduh PDF Bertanda Tangan' : 'Pratinjau PDF' }}</a>
-    @if ($p->staff_id === $me && !$p->selesai())
-        <form method="post" action="{{ route('pengajuan.batal', $p) }}" onsubmit="return confirm('Batalkan pengajuan ini?')">
+    @if ($bolehBatal)
+        <form method="post" action="{{ route('pengajuan.batal', $p) }}" onsubmit="return confirm('Batalkan pengajuan ini? Hanya bisa selama belum diproses.')">
             @csrf <button class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Batalkan</button>
         </form>
     @endif
@@ -97,6 +97,13 @@
                     @endforeach
                 </ul>
             </div>
+        @endif
+
+        {{-- Pengajuan sendiri tidak bisa diproses sendiri walau pemegang tahapnya (mis. admin HRD) --}}
+        @if (!$tahap && !$p->selesai() && $bolehLihatSendiri)
+            <div class="alert alert-light border small mb-0"><i class="bi bi-info-circle me-1"></i>
+                Ini pengajuan Anda sendiri, jadi tidak bisa Anda proses. Tahap <strong>{{ \App\Models\JenisPengajuan::TAHAP[$p->tahapSekarang()] ?? '' }}</strong>
+                diproses oleh: {{ $pemutusLain ?: 'belum ada pemutus lain' }}.</div>
         @endif
 
         {{-- Tombol proses untuk pemutus tahap yang sedang berjalan --}}
