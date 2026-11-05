@@ -7,6 +7,13 @@
 @section('actions')
     <a href="{{ route('pengajuan.pdf', $p) }}" target="_blank" class="btn {{ $p->status === 'Disetujui' ? 'btn-success' : 'btn-outline-secondary' }}">
         <i class="bi bi-file-earmark-pdf me-1"></i>{{ $p->status === 'Disetujui' ? 'Unduh PDF Bertanda Tangan' : 'Pratinjau PDF' }}</a>
+    @if ($bolehLihatSendiri && !$p->selesai())
+        @php($lagi = $p->jedaIngat())
+        <form method="post" action="{{ route('pengajuan.ingatkan', $p) }}">@csrf
+            <button class="btn btn-outline-warning" @disabled($lagi) title="{{ $lagi ? "Bisa mengingatkan lagi mulai {$lagi}" : 'Kirim pengingat Telegram ke pemroses tahap ' . (\App\Models\JenisPengajuan::TAHAP[$p->tahapSekarang()] ?? '') }}">
+                <i class="bi bi-bell me-1"></i>Ingatkan {{ \App\Models\JenisPengajuan::TAHAP[$p->tahapSekarang()] ?? '' }}</button>
+        </form>
+    @endif
     @if ($bolehBatal)
         <form method="post" action="{{ route('pengajuan.batal', $p) }}" onsubmit="return confirm('Batalkan pengajuan ini? Hanya bisa selama belum diproses.')">
             @csrf <button class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Batalkan</button>
@@ -88,7 +95,7 @@
                             @if (!empty($n['error']))<i class="bi bi-exclamation-triangle text-danger me-1"></i>
                             @elseif (!empty($n['dilewati']))<i class="bi bi-exclamation-circle text-warning me-1"></i>
                             @else<i class="bi bi-check2-all text-success me-1"></i>@endif
-                            Ke {{ $n['untuk'] }} · {{ \Illuminate\Support\Carbon::parse($n['at'])->diffForHumans() }}
+                            {{ ($n['jenis'] ?? null) === 'ingat' ? 'Pengingat ke' : 'Ke' }} {{ $n['untuk'] }} · {{ \Illuminate\Support\Carbon::parse($n['at'])->diffForHumans() }}
                             @if ($n['terkirim'])<div class="text-muted ms-3">Terkirim: {{ implode(', ', $n['terkirim']) }}</div>@endif
                             @foreach ($n['dilewati'] as $d)<div class="text-warning-emphasis ms-3">{{ $d['penerima'] ?? '?' }}: {{ str_replace('_', ' ', $d['alasan'] ?? 'gagal') }}</div>@endforeach
                             @if (!empty($n['error']))<div class="text-danger ms-3">{{ $n['error'] }}{{ $n['kepada'] ? '' : ' (tidak ada penerima)' }}</div>@endif

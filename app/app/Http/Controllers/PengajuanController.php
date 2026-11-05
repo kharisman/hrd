@@ -205,6 +205,19 @@ class PengajuanController extends Controller
         return back()->with('ok', 'Pengajuan dibatalkan.');
     }
 
+    // Pengaju mengingatkan pemutus tahap sekarang (PIC) lewat Telegram, maks. sekali per 6 jam per tahap
+    public function ingatkan(Pengajuan $pengajuan)
+    {
+        abort_unless($this->myStaffIds()->contains($pengajuan->staff_id) && !$pengajuan->selesai(), 403);
+        if ($lagi = $pengajuan->jedaIngat()) {
+            return back()->withErrors("Pengingat sudah dikirim. Bisa mengingatkan lagi mulai {$lagi}.");
+        }
+        $log = $pengajuan->ingatkan();
+        return $log['terkirim']
+            ? back()->with('ok', 'Pengingat terkirim ke ' . implode(', ', $log['terkirim']) . '.')
+            : back()->withErrors('Pengingat tidak terkirim' . ($log['dilewati'] ? ': penerima belum menghubungkan Telegram.' : '.') . ' Lihat kartu Notifikasi Telegram.');
+    }
+
     // Pengaju (akun mana pun ber-NIP sama) boleh membatalkan selama belum ada keputusan di tahap mana pun
     private function bolehBatal(Pengajuan $p): bool
     {
@@ -221,6 +234,22 @@ class PengajuanController extends Controller
             ? base64_encode(\Endroid\QrCode\Builder\Builder::create()
                 ->data(route('validasi', $pengajuan->kode_validasi))->size(240)->margin(0)->build()->getString())
             : null;
+
+        // Cuti: format resmi HRD (form + surat persetujuan bertanda tangan Warek II)
+        if ($pengajuan->jenis_cuti_id) {
+            $kembali = $pengajuan->tgl_selesai->copy()->addDay();
+            while (HariLibur::hariKerja($kembali->copy()->subDay(), $kembali) === 0) {
+                $kembali->addDay(); // hari kerja pertama setelah cuti (lewati akhir pekan & Kalender Libur)
+            }
+            $nipPengganti = JenisPengajuan::nipPegawai($pengajuan->data['pengganti'] ?? null);
+            $warek2 = Staff::find(Pejabat::where('peran', 'warek2')->value('staff_id')) ?? Pejabat::dariRole('warek2')->first();
+            return \Barryvdh\DomPDF\Facade\Pdf::loadView('pengajuan.pdf-cuti', [
+                'p' => $pengajuan, 'qr' => $qr, 'kota' => Pengaturan::nilai('kota', 'Palembang'), 'kembali' => $kembali,
+                'pengganti' => $nipPengganti ? Staff::utama($nipPengganti) : null,
+                'rektor' => $pengajuan->penandatangan ?? ['nama' => Pengaturan::penandatangan()?->nama],
+                'warek2' => $warek2,
+            ])->setPaper('a4')->stream('Cuti-' . str_replace('/', '-', $pengajuan->nomor ?? $pengajuan->id) . '.pdf');
+        }
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('pengajuan.pdf', [
             'p' => $pengajuan,
@@ -261,7 +290,8 @@ class PengajuanController extends Controller
     private function bolehLihat(Pengajuan $p): bool
     {
         return $this->isAdmin() || $this->myStaffIds()->contains($p->staff_id) || (!$p->anonim && $this->atasannya($p))
-            || Pejabat::peranDari($this->myStaffIds())->intersect($p->tahapan ?? [])->isNotEmpty();
+            || Pejabat::peranDari($this->myStaffIds())->intersect($p->tahapan ?? [])->isNotEmpty()
+            || (!$p->anonim && in_array('kaprodi', $p->tahapan ?? []) && Pengajuan::kaprodiUntuk($p->staff_id)->intersect($this->myStaffIds())->isNotEmpty());
     }
 
     // Tahap yang boleh diputus user ini sekarang, atau null. Alur wajib urut (hanya tahap yang sedang berjalan),
@@ -274,6 +304,7 @@ class PengajuanController extends Controller
         }
         $boleh = match ($tahap) {
             'atasan' => $this->atasannya($p),
+            'kaprodi' => Pengajuan::kaprodiUntuk($p->staff_id)->intersect($this->myStaffIds())->isNotEmpty(),
             'hrd' => $this->isAdmin(),
             default => Pejabat::peranDari($this->myStaffIds())->contains($tahap),
         };

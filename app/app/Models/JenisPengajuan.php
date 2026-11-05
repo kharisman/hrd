@@ -12,7 +12,7 @@ class JenisPengajuan extends Model
     protected $casts = ['isian' => 'array', 'tahapan' => 'array', 'aktif' => 'boolean', 'boleh_anonim' => 'boolean'];
 
     // Tahap persetujuan yang bisa disusun bebas: atasan langsung, admin HRD, atau pemegang peran pejabat
-    const TAHAP = ['atasan' => 'Atasan', 'hrd' => 'HRD'] + Pejabat::PERAN;
+    const TAHAP = ['atasan' => 'Atasan', 'kaprodi' => 'Kaprodi', 'hrd' => 'HRD'] + Pejabat::PERAN;
     const TIPE = ['text' => 'Teks singkat', 'textarea' => 'Teks panjang', 'date' => 'Tanggal', 'time' => 'Jam',
         'number' => 'Angka', 'rupiah' => 'Rupiah', 'select' => 'Pilihan', 'file' => 'Berkas', 'pegawai' => 'Pilih pegawai'];
 

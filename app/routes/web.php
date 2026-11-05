@@ -86,11 +86,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('pejabat/{pejabat}', 'hapusPejabat')->name('pejabat.hapus');
         Route::get('api', 'api')->name('api');
         Route::get('kelengkapan', \App\Http\Controllers\KelengkapanController::class)->name('kelengkapan');
+        Route::get('audit', \App\Http\Controllers\AuditController::class)->name('audit');
         Route::post('api/cek', 'cekApi')->name('api.cek');
     });
 
     Route::resource('pengajuan', PengajuanController::class)->only('index', 'create', 'store', 'show');
     Route::post('pengajuan/{pengajuan}/proses', [PengajuanController::class, 'proses'])->name('pengajuan.proses');
+    Route::post('pengajuan/{pengajuan}/ingatkan', [PengajuanController::class, 'ingatkan'])->name('pengajuan.ingatkan');
     Route::post('pengajuan/{pengajuan}/batal', [PengajuanController::class, 'batal'])->name('pengajuan.batal');
     Route::get('pengajuan/{pengajuan}/pdf', [PengajuanController::class, 'pdf'])->name('pengajuan.pdf');
     Route::get('pengajuan/{pengajuan}/berkas/{key}', [PengajuanController::class, 'berkas'])->name('pengajuan.berkas');

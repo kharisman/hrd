@@ -48,8 +48,29 @@ class Pengajuan extends Model
         $staffIds = collect($staffIds);
         $bawahan = $staffIds->isEmpty() ? collect() : Staff::whereIn('atasan_id', $staffIds)->pluck('id');
         $status = Pejabat::peranDari($staffIds)->map([self::class, 'menunggu'])->when($admin, fn ($s) => $s->push(self::menunggu('hrd')));
-        return $q->whereNotIn('staff_id', $staffIds)->where(fn ($w) => $w->whereIn('status', $status)
+        // ponytail: cek kaprodi per pengajuan di PHP (jumlah "Menunggu Kaprodi" kecil); pindah ke query bila banyak
+        $kaprodi = $staffIds->isEmpty() ? [] : static::where('status', self::menunggu('kaprodi'))->get(['id', 'staff_id'])
+            ->filter(fn ($p) => self::kaprodiUntuk($p->staff_id)->intersect($staffIds)->isNotEmpty())->pluck('id')->all();
+        return $q->whereNotIn('staff_id', $staffIds)->where(fn ($w) => $w->whereIn('status', $status)->orWhereIn('id', $kaprodi)
             ->orWhere(fn ($x) => $x->where('status', self::menunggu('atasan'))->whereIn('staff_id', $bawahan)->where('anonim', false)));
+    }
+
+    /**
+     * Kaprodi pengaju: pegawai ber-role/level kaprodi yang dosen aktifnya satu prodi (homebase) dengan dosen pengaju.
+     * Aturan sama dengan Akses::prodiDosen. @return \Illuminate\Support\Collection<int> staff id (semua akun ber-NIP sama)
+     */
+    public static function kaprodiUntuk(?int $staffId)
+    {
+        $nip = Staff::whereKey($staffId)->value('nip');
+        $milik = $nip ? Staff::where('nip', $nip)->pluck('id') : collect([$staffId]);
+        $prodi = Dosen::where('aktif', true)->whereIn('staff_id', $milik)->whereNotNull('program_studi')->value('program_studi');
+        if (!$prodi) {
+            return collect();
+        }
+        $nipDosen = Staff::whereIn('id', Dosen::where('aktif', true)->where('program_studi', $prodi)->whereNotNull('staff_id')->pluck('staff_id'))->pluck('nip')->filter();
+        $kaprodiNip = Staff::whereIn('nip', $nipDosen)->where('aktif', true)->get()
+            ->filter(fn ($s) => in_array('kaprodi', (array) $s->roles) || strcasecmp((string) $s->level, 'Kaprodi') === 0)->pluck('nip')->unique();
+        return Staff::whereIn('nip', $kaprodiNip)->pluck('id');
     }
 
     public function jenis()
@@ -87,7 +108,13 @@ class Pengajuan extends Model
     // Kolom alur saat dikirim: salinan tahapan jenis, tanpa tahap atasan bila tak punya atasan / anonim
     public static function alurAwal(JenisPengajuan $jenis, Staff $staff, bool $anonim): array
     {
-        $tahapan = array_values(array_filter($jenis->tahapan ?: ['hrd'], fn ($t) => $t !== 'atasan' || ($staff->atasan_id && !$anonim)));
+        // Tahap atasan/kaprodi dilewati bila tidak ada orangnya, pengajuan anonim, atau pengaju sendiri kaprodinya
+        $kaprodi = in_array('kaprodi', $jenis->tahapan ?? []) ? self::kaprodiUntuk($staff->id) : collect();
+        $tahapan = array_values(array_filter($jenis->tahapan ?: ['hrd'], fn ($t) => match ($t) {
+            'atasan' => $staff->atasan_id && !$anonim,
+            'kaprodi' => !$anonim && $kaprodi->isNotEmpty() && !$kaprodi->contains($staff->id),
+            default => true,
+        }));
         $tahapan = $tahapan ?: ['hrd']; // alur "Atasan saja" tanpa atasan → HRD yang memutus
         return ['tahapan' => $tahapan, 'tahap_ke' => 0, 'riwayat' => [], 'status' => self::menunggu($tahapan[0])];
     }
@@ -126,20 +153,21 @@ class Pengajuan extends Model
         if ($tahap === 'hrd') {
             return Akun::where('peran', 'admin')->pluck('username');
         }
-        $ids = ($tahap === 'atasan' ? collect([$this->staff?->atasan_id])
+        $ids = ($tahap === 'kaprodi' ? self::kaprodiUntuk($this->staff_id)->take(1)
+            : ($tahap === 'atasan' ? collect([$this->staff?->atasan_id])
             : Pejabat::where('peran', $tahap)->pluck('staff_id')->merge(Pejabat::dariRole($tahap)->pluck('id'))
-                ->when($tahap === 'rektor', fn ($c) => $c->push(Pengaturan::penandatangan()?->id)))->filter();
+                ->when($tahap === 'rektor', fn ($c) => $c->push(Pengaturan::penandatangan()?->id))))->filter();
         return self::usernamePegawai($ids)->diff(self::usernamePegawai([$this->staff_id]))->values();
     }
 
     // Satu username per pegawai (supaya tidak dapat pesan ganda): akun HRD yang terakhir login, kalau belum pernah login
-    // username master staff utama (Staff::utama) dari NIP yang sama
+    // username data pegawai yang ditunjuk itu sendiri (mis. pejabat Warek II = tata_2), terakhir staff utama ber-NIP sama
     private static function usernamePegawai($staffIds)
     {
         return Staff::whereIn('id', $staffIds)->get()->map(function ($s) {
             $ids = $s->nip ? Staff::where('nip', $s->nip)->pluck('id') : collect([$s->id]);
             return Akun::whereIn('staff_id', $ids)->orderByDesc('last_login_at')->value('username')
-                ?? ($s->nip ? Staff::utama($s->nip)?->username : null) ?? $s->username;
+                ?? $s->username ?? ($s->nip ? Staff::utama($s->nip)?->username : null);
         })->filter()->unique()->values();
     }
 
@@ -150,23 +178,57 @@ class Pengajuan extends Model
         $judul = e($this->jenis->nama ?? 'Pengajuan') . ($this->jenis_cuti_id ? ' (' . e($this->jenisCuti->nama ?? '') . ', ' . $this->tgl_mulai->format('d/m/Y') . ' – ' . $this->tgl_selesai->format('d/m/Y') . ", {$this->hari} hari)" : '');
         if ($this->selesai()) {
             $catatan = collect($this->riwayat)->last()['catatan'] ?? null;
-            $hasil = \App\Services\Telegram::kirim($kepada = self::usernamePegawai([$this->staff_id]),
+            $log[] = $this->kirimNotif('Pengaju', self::usernamePegawai([$this->staff_id]),
                 ($this->status === 'Disetujui' ? '✅' : '❌') . " {$judul} <b>{$this->status}</b>" . ($this->nomor ? "\nNomor: {$this->nomor}" : '')
                 . ($catatan ? "\nCatatan: " . e($catatan) : ''), $tautan('Lihat pengajuan'), "hrd-pengajuan-{$this->id}-selesai");
-            $untuk = 'Pengaju';
+            // Cuti disetujui → pegawai pengganti diberi tahu (isian "pengganti": "Nama · Divisi · NIP")
+            $nip = $this->status === 'Disetujui' ? JenisPengajuan::nipPegawai($this->data['pengganti'] ?? null) : null;
+            if ($nip && ($pengganti = Staff::utama($nip))) {
+                $log[] = $this->kirimNotif('Pengganti', self::usernamePegawai([$pengganti->id]),
+                    "🤝 Anda ditunjuk sebagai <b>pegawai pengganti</b> selama " . e($this->jenisCuti->nama ?? 'cuti') . " <b>" . e($this->staff->nama ?? '') . "</b>"
+                    . " (" . e($this->staff->divisi ?? '') . "), {$this->tgl_mulai->format('d/m/Y')} – {$this->tgl_selesai->format('d/m/Y')}."
+                    . ($this->staff?->no_hp ? "\nKontak: " . e($this->staff->no_hp) : ''), null, "hrd-pengajuan-{$this->id}-pengganti");
+            }
         } else {
-            $hasil = \App\Services\Telegram::kirim($kepada = $this->penerimaTahap(),
+            $log[] = $this->kirimNotif(JenisPengajuan::TAHAP[$this->tahapSekarang()] ?? $this->tahapSekarang(), $this->penerimaTahap(),
                 "📝 {$judul} dari <b>" . e($this->namaPengaju()) . "</b> menunggu persetujuan Anda ({$this->status}).",
                 $tautan('Proses sekarang'), "hrd-pengajuan-{$this->id}-tahap-{$this->tahap_ke}");
-            $untuk = JenisPengajuan::TAHAP[$this->tahapSekarang()] ?? $this->tahapSekarang();
         }
-        // Log kiriman (id API untuk dilacak lewat GET /notifikasi/{id}); null = tidak dikirim (API tak terjangkau / tanpa penerima)
-        $this->updateQuietly(['notifikasi' => [...($this->notifikasi ?? []), [
+        $this->updateQuietly(['notifikasi' => [...($this->notifikasi ?? []), ...$log]]);
+    }
+
+    /**
+     * Pengingat manual dari pengaju ke pemutus tahap sekarang. Dibatasi sekali per 6 jam per tahap.
+     * @return ?string waktu boleh mengingatkan lagi (null = boleh sekarang)
+     */
+    public function jedaIngat(): ?string
+    {
+        $akhir = collect($this->notifikasi)->where('jenis', 'ingat')->where('tahap_ke', $this->tahap_ke)->last();
+        $lagi = $akhir ? \Illuminate\Support\Carbon::parse($akhir['at'])->addHours(6) : null;
+        return $lagi?->isFuture() ? $lagi->translatedFormat('d M H:i') : null;
+    }
+
+    public function ingatkan(): array
+    {
+        $judul = e($this->jenis->nama ?? 'Pengajuan') . ($this->jenis_cuti_id ? ' (' . e($this->jenisCuti->nama ?? '') . ', ' . $this->tgl_mulai->format('d/m/Y') . ' – ' . $this->tgl_selesai->format('d/m/Y') . ')' : '');
+        $hari = $this->updated_at->diffInDays() ?: null;
+        $log = $this->kirimNotif(JenisPengajuan::TAHAP[$this->tahapSekarang()] ?? $this->tahapSekarang(), $this->penerimaTahap(),
+            "⏰ <b>Pengingat</b> dari " . e($this->namaPengaju()) . ": {$judul} masih menunggu persetujuan Anda" . ($hari ? " sejak {$hari} hari lalu" : '') . '.',
+            ['teks' => 'Proses sekarang', 'url' => route('pengajuan.show', $this)], "hrd-pengajuan-{$this->id}-ingat-{$this->tahap_ke}-" . now()->format('YmdH'));
+        $this->updateQuietly(['notifikasi' => [...($this->notifikasi ?? []), $log + ['jenis' => 'ingat', 'tahap_ke' => $this->tahap_ke]]]);
+        return $log;
+    }
+
+    // Kirim + baris log (id API untuk dilacak lewat GET /notifikasi/{id}); error "tidak terkirim" = API tak terjangkau / tanpa penerima
+    private function kirimNotif(string $untuk, $kepada, string $pesan, ?array $tautan, string $kunci): array
+    {
+        $hasil = \App\Services\Telegram::kirim($kepada, $pesan, $tautan, $kunci);
+        return [
             'untuk' => $untuk, 'at' => now()->toDateTimeString(), 'kepada' => collect($kepada)->values()->all(),
             'id' => $hasil['id'] ?? null, 'terkirim' => $hasil['terkirim'] ?? [],
             'dilewati' => collect($hasil['dilewati'] ?? [])->merge($hasil['gagal'] ?? [])->all(),
             'error' => $hasil === null ? 'tidak terkirim' : ($hasil['pesan'] ?? $hasil['error'] ?? null),
-        ]]]);
+        ];
     }
 
     // "Laporan Capaian Dosen" disetujui → masuk rapor dosen pengaju (satu pengajuan = satu capaian)
