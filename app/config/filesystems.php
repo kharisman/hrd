@@ -30,9 +30,11 @@ return [
 
     'disks' => [
 
+        // Berkas unggahan (lampiran pengajuan, ijazah) di public_html/berkas. Folder itu dikunci .htaccess/web.config
+        // (tolak akses langsung + skrip tidak dijalankan); unduh hanya lewat controller yang mengecek hak akses.
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app'),
+            'root' => base_path('public_html/berkas'),
             'throw' => false,
         ],
 
