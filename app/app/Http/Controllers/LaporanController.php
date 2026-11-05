@@ -146,7 +146,11 @@ class LaporanController extends Controller
         if ($r->boolean('export')) {
             $book = new Spreadsheet();
             $sheet = $book->getActiveSheet()->setTitle(substr(preg_replace('/[^\w ]/', '', $judul), 0, 31));
-            $sheet->fromArray([[$judul], ['Dicetak ' . now()->translatedFormat('d F Y H:i')], [], $kolom], null, 'A1');
+            $peminta = auth()->user()?->name ?? '-';
+            $sheet->fromArray([[$judul], ['Diekspor oleh ' . $peminta . ' · ' . now()->translatedFormat('d F Y H:i') . ' · RAHASIA, hanya untuk keperluan dinas'], [], $kolom], null, 'A1');
+            // Tanda peminta ikut tercetak di setiap halaman & di properti berkas
+            $sheet->getHeaderFooter()->setOddFooter('&L&8Diekspor oleh ' . $peminta . ' ' . now()->format('d/m/Y H:i') . '&R&8Halaman &P / &N');
+            $book->getProperties()->setCreator($peminta)->setTitle($judul)->setDescription('Diekspor dari aplikasi HRD ITB PalComTech');
             $sheet->fromArray($baris->map(fn ($b) => array_map(fn ($v) => $v ?? '', $b))->all(), null, 'A5', true);
             $akhir = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($kolom));
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
