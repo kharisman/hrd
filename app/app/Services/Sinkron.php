@@ -118,7 +118,11 @@ class Sinkron
                 // Dosen yang juga pegawai: penghubungnya disimpan di HRD (staff_id), API tidak punya kolom ini.
                 // Otomatis lewat nama; tautan manual dari form dosen tidak ditimpa.
                 $staffId = $staffIdByNama[self::namaInti($d['Nama'])] ?? null;
-                if (!$row->staff_id && $staffId && !Dosen::where('staff_id', $staffId)->exists()) {
+                // staff_id unik: kalau dipegang data dosen lama (nonaktif), tautan dipindah ke dosen aktif ini
+                if (!$row->staff_id && $staffId && $row->aktif && !Dosen::where('staff_id', $staffId)->where('aktif', true)->whereKeyNot($row->id)->exists()) {
+                    Dosen::where('staff_id', $staffId)->whereKeyNot($row->id)->update(['staff_id' => null]);
+                    $row->staff_id = $staffId;
+                } elseif (!$row->staff_id && $staffId && !Dosen::where('staff_id', $staffId)->exists()) {
                     $row->staff_id = $staffId;
                 }
 
@@ -130,12 +134,10 @@ class Sinkron
             $stat['dosen_tertaut_pegawai'] = Dosen::whereNotNull('staff_id')->count();
             $stat['staff_aktif'] = Staff::aktif()->count();
 
-            // 3. Akun yang pernah login: perbarui tautan ke pegawai & dosen (username sama)
+            // 3. Akun yang pernah login: perbarui tautan ke pegawai & dosen (Akun::tautan)
             foreach (Akun::all() as $akun) {
-                $akun->update([
-                    'staff_id' => Staff::where('username', $akun->username)->value('id'),
-                    'dosen_id' => Dosen::where('username', $akun->username)->value('id'),
-                ]);
+                [$staff, $dosen] = Akun::tautan($akun->username, $akun->nip);
+                $akun->update(['staff_id' => $staff?->id, 'dosen_id' => $dosen?->id]);
             }
         });
 

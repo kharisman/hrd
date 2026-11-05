@@ -40,6 +40,7 @@ class JenisCutiController extends Controller
         return $request->validate([
             'nama' => ['required', 'string', 'max:100', Rule::unique('jenis_cuti')->ignore($j)],
             'kuota' => 'nullable|integer|min:1|max:366',
+            'jenis_kelamin' => 'nullable|in:L,P',
             'keterangan' => 'nullable|string|max:255',
         ]) + ['aktif' => $request->boolean('aktif')];
     }

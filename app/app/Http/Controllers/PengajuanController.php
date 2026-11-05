@@ -78,7 +78,7 @@ class PengajuanController extends Controller
         foreach ($jenis->isian as $f) {
             $aturan["isian.{$f['key']}"] = array_merge([$f['wajib'] ? 'required' : 'nullable'], match ($f['tipe']) {
                 'date' => ['date'], 'time' => ['date_format:H:i'], 'number' => ['numeric', 'min:0'],
-                'rupiah' => ['regex:/^[\d.,\s]+$/'], 'select' => [Rule::in($f['opsi'] ?? [])],
+                'rupiah' => ['regex:/^[\d.,\s]+$/'], 'select' => [Rule::in($f['opsi'] ?? [])], 'pegawai' => [Rule::in(JenisPengajuan::pilihanPegawai())],
                 'file' => ['file', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx', 'max:5120'],
                 'textarea' => ['string', 'max:5000'], default => ['string', 'max:255'],
             });
@@ -116,7 +116,10 @@ class PengajuanController extends Controller
         ], [], ['jenis_cuti_id' => 'jenis cuti', 'tgl_mulai' => 'tanggal mulai', 'tgl_selesai' => 'tanggal selesai']);
 
         $tahun = Carbon::parse($d['tgl_mulai'])->year;
-        $jatah = JenisCuti::rekap($this->myStaffIds()->all(), $tahun)[$d['jenis_cuti_id']];
+        $jatah = JenisCuti::rekap($this->myStaffIds()->all(), $tahun)[$d['jenis_cuti_id']] ?? null;
+        if (!$jatah) {
+            throw ValidationException::withMessages(['jenis_cuti_id' => 'Jenis cuti ini tidak berlaku untuk Anda.']);
+        }
         $hari = Carbon::parse($d['tgl_mulai'])->diffInDays($d['tgl_selesai']) + 1;
         if ($jatah->sisa !== null && $hari > $jatah->sisa) {
             throw ValidationException::withMessages(['tgl_selesai' => "Melebihi jatah {$jatah->jenis->nama} {$tahun}: diajukan {$hari} hari, sisa {$jatah->sisa} dari {$jatah->kuota} hari."]);

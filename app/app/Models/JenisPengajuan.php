@@ -14,7 +14,19 @@ class JenisPengajuan extends Model
     // Tahap persetujuan yang bisa disusun bebas: atasan langsung, admin HRD, atau pemegang peran pejabat
     const TAHAP = ['atasan' => 'Atasan', 'hrd' => 'HRD'] + Pejabat::PERAN;
     const TIPE = ['text' => 'Teks singkat', 'textarea' => 'Teks panjang', 'date' => 'Tanggal', 'time' => 'Jam',
-        'number' => 'Angka', 'rupiah' => 'Rupiah', 'select' => 'Pilihan', 'file' => 'Berkas'];
+        'number' => 'Angka', 'rupiah' => 'Rupiah', 'select' => 'Pilihan', 'file' => 'Berkas', 'pegawai' => 'Pilih pegawai'];
+
+    // Isian tipe "pegawai": disimpan sebagai teks "Nama · Divisi · NIP" (tetap terbaca walau data pegawai berubah)
+    public static function pilihanPegawai(): array
+    {
+        return Staff::perOrang(Staff::aktif())->map(fn ($s) => implode(' · ', array_filter([$s->nama, $s->divisi, $s->nip])))->all();
+    }
+
+    // No. HP terkini dari NIP di ujung teks pilihan
+    public static function hpPegawai(?string $teks): ?string
+    {
+        return $teks ? Staff::utama(trim(\Illuminate\Support\Str::afterLast($teks, '·')))?->no_hp : null;
+    }
     const KATEGORI = ['Kehadiran & Waktu Kerja', 'Data & Dokumen', 'Pengembangan Karier', 'Keuangan & Kesejahteraan', 'Hubungan Kerja', 'Lainnya'];
 
     public static function teksAlur(array $tahapan): string

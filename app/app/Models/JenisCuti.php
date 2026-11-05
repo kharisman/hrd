@@ -34,7 +34,10 @@ class JenisCuti extends Model
         $disetujui = $hari(Pengajuan::cuti()->where('status', 'Disetujui'));
         $proses = $hari(Pengajuan::cuti()->menunggu());
 
-        return self::where('aktif', true)->orderBy('id')->get()->map(function ($j) use ($disetujui, $proses) {
+        // Jenis khusus satu jenis kelamin (mis. Melahirkan = P) hanya untuk pegawai itu; jenis kelamin kosong = semua jenis tampil
+        $jk = Staff::whereIn('id', (array) $staffId)->whereNotNull('jenis_kelamin')->value('jenis_kelamin');
+        return self::where('aktif', true)->when($jk, fn ($q) => $q->where(fn ($w) => $w->whereNull('jenis_kelamin')->orWhere('jenis_kelamin', $jk)))
+            ->orderBy('id')->get()->map(function ($j) use ($disetujui, $proses) {
             $terpakai = (int) ($disetujui[$j->id] ?? 0) + (int) ($proses[$j->id] ?? 0);
             return (object) [
                 'jenis' => $j,

@@ -67,6 +67,7 @@
             ['riwayat.index', 'journal-bookmark', 'Studi Lanjut', 'aktif' => 'riwayat*'],
         ]] : ['staff.index', 'staff.*', 'people', 'Profil Saya'],
         ['pengajuan.index', 'pengajuan.*', 'ui-checks', 'Pengajuan'],
+        $admin ? ['grup', 'grupInput', 'Input Data', 'pencil-square', 'input.index', \App\Support\Menu::input()] : null,
         $admin ? ['sinkron.index', 'sinkron.*', 'arrow-repeat', 'Sinkron eUniversity'] : null,
         $admin ? ['grup', 'grupLaporan', 'Laporan', 'file-earmark-bar-graph', 'laporan.index', \App\Support\Menu::laporan()] : null,
         $admin ? ['grup', 'grupPengaturan', 'Pengaturan', 'gear', 'pengaturan.index', \App\Support\Menu::pengaturan()] : null,

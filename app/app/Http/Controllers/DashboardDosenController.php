@@ -172,20 +172,31 @@ class DashboardDosenController extends Controller
 
         return view('dashboard.dosen-kompetensi', [
             'prodi' => $prodi, 'tahun' => $tahun, 'daftarTahun' => $daftarTahun, 'baris' => $baris,
-            'edit' => $this->isAdmin() && $r->dosen ? $baris->first(fn ($b) => $b->model->id === $r->integer('dosen')) : null,
+            'edit' => $r->dosen ? $baris->first(fn ($b) => $b->model->id === $r->integer('dosen') && $this->bolehKompetensi($b->model)) : null,
             // Rata-rata per skill: kelemahan bersama yang perlu pelatihan
             'perSkill' => $skill->flatten()->groupBy(fn ($k) => $k->kelompok . '|' . $k->skill)
                 ->map(fn ($g) => ['sekarang' => round($g->avg('sekarang'), 1), 'target' => round($g->avg('target'), 1), 'n' => $g->count()]),
-            'bolehUbah' => $this->isAdmin(),
+            'bolehUbah' => $baris->filter(fn ($b) => $this->bolehKompetensi($b->model))->pluck('model.id')->flip(),
             // Pie "Jumlah Dosen Yang Mempunyai Sertifikat Kompetensi" (BNSP/LSP dari isian rapor)
             'sertifikat' => collect(['Kompeten' => $n = \App\Models\CapaianDosen::whereIn('dosen_id', $dosen->pluck('id'))->where('jenis', 'sertifikat')
                 ->get()->filter->kompetensi->pluck('dosen_id')->unique()->count(), 'Belum' => $dosen->count() - $n]),
         ]);
     }
 
+    // Kompetensi & target diisi HRD (admin) atau atasan langsung dosen itu (atasan_id staff, NIP sama = orang sama)
+    private function bolehKompetensi(Dosen $dosen): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+        static $saya;
+        $saya ??= \App\Models\Staff::where('nip', \App\Models\Staff::whereKey(auth()->user()->staff_id)->value('nip') ?? '-')->pluck('id');
+        return $dosen->staff?->atasan_id && $saya->contains($dosen->staff->atasan_id);
+    }
+
     public function simpanKompetensi(Request $r, Dosen $dosen)
     {
-        abort_unless($this->isAdmin(), 403);
+        abort_unless($this->bolehKompetensi($dosen), 403);
         $d = $r->validate([
             'tahun' => 'required|integer|min:2000|max:2100',
             'skill' => 'array', 'skill.*.kelompok' => ['required', Rule::in(array_keys(Kompetensi::KELOMPOK))],

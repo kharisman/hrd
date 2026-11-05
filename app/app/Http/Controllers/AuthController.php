@@ -39,8 +39,7 @@ class AuthController extends Controller
     public function masuk(Request $request, PctApi $api, array $profil)
     {
         // Username login = Username di master staff/dosen (salinan sinkron)
-        $staff = Staff::where('username', $profil['username'])->first();
-        $dosen = Dosen::where('username', $profil['username'])->first();
+        [$staff, $dosen] = Akun::tautan($profil['username'], $profil['nip']);
 
         [$peran, $tolak] = $this->tentukanPeran($profil, $staff, $dosen);
         if ($tolak) {

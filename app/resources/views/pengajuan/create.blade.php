@@ -8,8 +8,18 @@
 @section('content')
 @if (!$jenis)
     {{-- Langkah 1: pilih jenis form --}}
+    {{-- Satu tab per kategori --}}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        @foreach ($daftar as $kategori => $items)
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $loop->first ? 'active' : '' }}" data-bs-toggle="tab" data-bs-target="#kat{{ $loop->index }}" type="button" role="tab">
+                    {{ $kategori }} <span class="badge text-bg-light">{{ $items->count() }}</span></button>
+            </li>
+        @endforeach
+    </ul>
+    <div class="tab-content">
     @foreach ($daftar as $kategori => $items)
-        <h6 class="text-muted text-uppercase small fw-semibold mt-3 mb-2">{{ $kategori }}</h6>
+        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="kat{{ $loop->index }}" role="tabpanel">
         <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-2">
             @foreach ($items as $j)
                 <div class="col">
@@ -24,7 +34,9 @@
                 </div>
             @endforeach
         </div>
+        </div>
     @endforeach
+    </div>
 @else
     {{-- Langkah 2: isi form --}}
     <form method="post" action="{{ route('pengajuan.store') }}" enctype="multipart/form-data" class="card" style="max-width:820px"><div class="card-body">
@@ -63,6 +75,11 @@
                                 <option value="">-</option>
                                 @foreach ($f['opsi'] ?? [] as $o)<option @selected(old($err) === $o)>{{ $o }}</option>@endforeach
                             </select>
+                            @break
+                        @case('pegawai')
+                            <input name="{{ $nama }}" value="{{ old($err) }}" list="dl-{{ $f['key'] }}" placeholder="Ketik nama pegawai…" autocomplete="off"
+                                   class="form-control @error($err) is-invalid @enderror" @required($f['wajib'])>
+                            <datalist id="dl-{{ $f['key'] }}">@foreach (\App\Models\JenisPengajuan::pilihanPegawai() as $o)<option value="{{ $o }}">@endforeach</datalist>
                             @break
                         @case('file')
                             <input type="file" name="{{ $nama }}" class="form-control @error($err) is-invalid @enderror" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" @required($f['wajib'])>

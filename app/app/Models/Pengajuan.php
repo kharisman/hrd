@@ -110,7 +110,30 @@ class Pengajuan extends Model
         });
         if ($this->status === 'Disetujui') {
             $this->sahkan();
+            $this->jadikanCapaian();
         }
+    }
+
+    // "Laporan Capaian Dosen" disetujui → masuk rapor dosen pengaju (satu pengajuan = satu capaian)
+    private function jadikanCapaian(): void
+    {
+        if ($this->jenis?->kode !== 'capaian') {
+            return;
+        }
+        $nip = Staff::whereKey($this->staff_id)->value('nip');
+        $dosen = Dosen::whereIn('staff_id', Staff::where('nip', $nip ?? '-')->pluck('id')->push($this->staff_id))->orderByDesc('aktif')->first();
+        if (!$dosen) {
+            return; // pengaju bukan dosen: tetap tercatat sebagai pengajuan saja
+        }
+        $d = $this->data;
+        $tgl = !empty($d['tanggal']) ? \Illuminate\Support\Carbon::parse($d['tanggal']) : null;
+        CapaianDosen::firstOrCreate(['pengajuan_id' => $this->id], [
+            'dosen_id' => $dosen->id,
+            'jenis' => array_search($d['jenis'] ?? '', CapaianDosen::JENIS) ?: 'sertifikat',
+            'judul' => $d['judul'] ?? '-', 'sumber' => $d['sumber'] ?? null, 'status' => $d['status'] ?? null,
+            'tahun' => $tgl?->year, 'bulan' => $tgl?->month, 'link' => $d['link'] ?? null,
+            'keterangan' => 'Dari pengajuan ' . $this->nomor,
+        ]);
     }
 
     /**

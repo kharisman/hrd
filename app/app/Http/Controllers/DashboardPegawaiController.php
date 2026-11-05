@@ -10,7 +10,7 @@ use App\Models\Staff;
 use Illuminate\Http\Request;
 
 // Dashboard SDM (pengganti spreadsheet "Data Keterlambatan", "Data Kehadiran", "Turn over"):
-// rekap bulanan keterlambatan & ketidakhadiran per orang (NIP), turn over per tahun, dan input rekap bulanan.
+// rekap bulanan keterlambatan & ketidakhadiran per orang (NIP), turn over per tahun, (isian di menu Input Data).
 // Kelompok: prodi untuk dosen, "Tenaga Kependidikan" untuk lainnya (seperti spreadsheet).
 class DashboardPegawaiController extends Controller
 {
@@ -26,7 +26,7 @@ class DashboardPegawaiController extends Controller
 
     public function __invoke(Request $r)
     {
-        $tab = in_array($r->tab, ['ringkasan', 'kehadiran', 'turnover', 'disc', 'input']) ? $r->tab : 'ringkasan';
+        $tab = in_array($r->tab, ['ringkasan', 'kehadiran', 'turnover', 'disc']) ? $r->tab : 'ringkasan';
         $tahun = $r->integer('tahun') ?: (int) (Kehadiran::max('tahun') ?? now()->year);
         $orang = $this->orang(Staff::aktif());
         $kelompok = $r->kelompok && $orang->contains('kelompok', $r->kelompok) ? $r->kelompok : null;
@@ -42,7 +42,6 @@ class DashboardPegawaiController extends Controller
             'ringkasan' => app(DashboardController::class)->ringkasan(),
             'turnover' => $this->turnover(),
             'disc' => $this->disc($r),
-            'input' => $this->formInput($orang, $tahun, $r->integer('bulan') ?: now()->month),
         });
     }
 
@@ -149,8 +148,6 @@ class DashboardPegawaiController extends Controller
                 ->mapWithKeys(fn ($kp) => [$kp => $baris->where('katKomitmen', $km)->where('katKompetensi', $kp)->count()])]),
             // Gaya dominan = huruf pertama profil (D/I/S/C)
             'dominan' => $baris->countBy(fn ($b) => strtoupper(substr(trim((string) $b->disc->profil), 0, 1)) ?: '?')->sortKeys(),
-            'edit' => $this->isAdmin() && $r->staff ? Disc::with('staff')->firstOrNew(['staff_id' => $r->integer('staff')]) : null,
-            'pilihanStaff' => $this->isAdmin() ? Staff::perOrang(Staff::aktif()) : collect(),
         ];
     }
 
@@ -163,11 +160,7 @@ class DashboardPegawaiController extends Controller
         // Selalu di akun utama orang itu
         $d['staff_id'] = Staff::utama(Staff::whereKey($d['staff_id'])->value('nip'))?->id ?? $d['staff_id'];
         Disc::updateOrCreate(['staff_id' => $d['staff_id']], $d);
-        return redirect()->route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $d['tim']])->with('ok', 'Peta karakter disimpan.');
+        return redirect()->route('input.disc')->with('ok', 'Peta karakter disimpan.');
     }
 
-    private function formInput($orang, int $tahun, int $bulan): array
-    {
-        return ['bulan' => $bulan, 'baris' => $orang, 'isian' => Kehadiran::where(['tahun' => $tahun, 'bulan' => $bulan])->get()->keyBy('staff_id')];
-    }
 }

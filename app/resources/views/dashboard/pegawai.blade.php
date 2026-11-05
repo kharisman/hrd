@@ -3,6 +3,10 @@
 
 @section('actions')
     <a href="{{ route('pengajuan.create', ['jenis' => $jenisCuti]) }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Ajukan Cuti</a>
+    @if ($dosenSaya = auth()->user()->dosen_id)
+        <a href="{{ route('pengajuan.create', ['jenis' => \App\Models\JenisPengajuan::where('kode', 'capaian')->value('id')]) }}" class="btn btn-outline-primary"><i class="bi bi-award me-1"></i>Laporkan Capaian</a>
+        <a href="{{ route('dashboard.dosen.rapor', $dosenSaya) }}" class="btn btn-outline-secondary"><i class="bi bi-file-person me-1"></i>Rapor Saya</a>
+    @endif
 @endsection
 
 @section('content')

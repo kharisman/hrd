@@ -38,6 +38,8 @@
                             <span class="text-muted">-</span>
                         @elseif ($f['tipe'] === 'file')
                             <a href="{{ route('pengajuan.berkas', [$p, $f['key']]) }}" target="_blank"><i class="bi bi-file-earmark-text me-1"></i>Lihat berkas</a>
+                        @elseif ($f['tipe'] === 'pegawai')
+                            {{ $v }} @if ($hp = \App\Models\JenisPengajuan::hpPegawai($v))<br><a href="https://wa.me/{{ preg_replace(['/\D/', '/^0/'], ['', '62'], $hp) }}" target="_blank" class="small"><i class="bi bi-whatsapp me-1"></i>{{ $hp }}</a>@endif
                         @elseif ($f['tipe'] === 'rupiah')
                             Rp {{ number_format($v, 0, ',', '.') }}
                         @elseif ($f['tipe'] === 'date')

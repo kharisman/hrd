@@ -10,7 +10,7 @@
 
 @section('content')
 <ul class="nav nav-tabs mb-0">
-    @foreach (['ringkasan' => 'Ringkasan', 'kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over', 'disc' => 'Peta Karakter (DISC)'] + (Gate::allows('admin') ? ['input' => 'Input Rekap Bulanan'] : []) as $k => $l)
+    @foreach (['ringkasan' => 'Ringkasan', 'kehadiran' => 'Kehadiran & Keterlambatan', 'turnover' => 'Turn Over', 'disc' => 'Peta Karakter (DISC)'] as $k => $l)
         <li class="nav-item"><a class="nav-link {{ $tab === $k ? 'active' : '' }}" href="{{ route('dashboard.pegawai', ['tab' => $k, 'tahun' => $tahun]) }}">{{ $l }}</a></li>
     @endforeach
 </ul>
@@ -19,19 +19,15 @@
 <div class="mt-3">@include('dashboard._ringkasan')</div>
 @else
 <div class="card border-top-0 rounded-top-0 mb-3">
-    @if (in_array($tab, ['kehadiran', 'input']))
+    @if ($tab === 'kehadiran')
     <form class="bar-filter rounded-0">
         <input type="hidden" name="tab" value="{{ $tab }}">
         <select name="tahun" class="form-select" onchange="this.form.submit()">@foreach ($daftarTahun as $t)<option @selected($t == $tahun)>{{ $t }}</option>@endforeach</select>
-        @if ($tab === 'kehadiran')
             <select name="kelompok" class="form-select" onchange="this.form.submit()">
                 <option value="">Semua kelompok</option>
                 @foreach ($daftarKelompok as $k)<option @selected($k === $kelompok)>{{ $k }}</option>@endforeach
             </select>
             <span class="info">{{ $baris->count() }} orang{{ $tanpaData ? " · {$tanpaData} belum ada data" : '' }}</span>
-        @else
-            <select name="bulan" class="form-select" onchange="this.form.submit()">@foreach ($B as $i => $b)<option value="{{ $i }}" @selected($i == $bulan)>{{ $b }}</option>@endforeach</select>
-        @endif
     </form>
     @endif
 
@@ -129,12 +125,7 @@
             <option value="">Semua tim</option>
             @foreach ($daftarTim as $t)<option @selected($t === $tim)>{{ $t }}</option>@endforeach
         </select>
-        @can('admin')
-            <select name="staff" class="form-select" onchange="this.form.submit()">
-                <option value="">Petakan / ubah pegawai…</option>
-                @foreach ($pilihanStaff as $s)<option value="{{ $s->id }}">{{ $s->nama }}</option>@endforeach
-            </select>
-        @endcan
+        @can('admin')<a href="{{ route('input.disc') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Input DISC</a>@endcan
         <span class="info">{{ $baris->count() }} orang dipetakan</span>
     </form>
     <div class="card-body">
@@ -162,31 +153,13 @@
     </div>
 </div>
 
-@if ($edit)
-    <form method="post" action="{{ route('dashboard.pegawai.disc') }}" class="card mb-3"><div class="card-body">
-        @csrf <input type="hidden" name="staff_id" value="{{ $edit->staff_id }}">
-        <h6>Peta Karakter · {{ $edit->staff->nama ?? \App\Models\Staff::whereKey($edit->staff_id)->value('nama') }}</h6>
-        <div class="row g-2 small">
-            <div class="col-md-3"><label class="form-label mb-0">Tim</label><input name="tim" value="{{ $edit->tim }}" list="daftarTim" class="form-control form-control-sm">
-                <datalist id="daftarTim">@foreach ($daftarTim as $t)<option>{{ $t }}</option>@endforeach</datalist></div>
-            <div class="col-md-2"><label class="form-label mb-0">Profil DISC</label><input name="profil" value="{{ $edit->profil }}" placeholder="mis. S / C-S" class="form-control form-control-sm"></div>
-            <div class="col-md-2"><label class="form-label mb-0">Tanggal nilai</label><input type="date" name="dinilai_at" value="{{ $edit->dinilai_at?->format('Y-m-d') ?? now()->format('Y-m-d') }}" class="form-control form-control-sm"></div>
-            @foreach ($D::KOMITMEN + $D::KOMPETENSI as $k => $l)
-                <div class="col-6 col-md-1"><label class="form-label mb-0">{{ $l }}</label><input name="{{ $k }}" type="number" min="1" max="4" value="{{ $edit->$k }}" class="form-control form-control-sm"></div>
-            @endforeach
-        </div>
-        <div class="mt-2 d-flex gap-2"><button class="btn btn-sm btn-primary">Simpan</button>
-            <a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim]) }}" class="btn btn-sm btn-outline-secondary">Batal</a>
-            <span class="small text-muted align-self-center">Skor 1–4. 4 pertama = komitmen, 4 berikutnya = kompetensi.</span></div>
-    </div></form>
-@endif
 
 <div class="card">
     <div class="table-responsive">
     <table class="table table-sm table-hover small mb-0 align-middle">
         <thead class="table-light"><tr><th>Nama</th><th>Tim</th><th>Masa kerja</th><th>DISC</th>
             @foreach ($D::KOMITMEN + $D::KOMPETENSI as $l)<th class="text-center" title="{{ $l }}">{{ mb_substr($l, 0, 4) }}</th>@endforeach
-            <th>Komitmen</th><th>Kompetensi</th>@can('admin')<th></th>@endcan</tr></thead>
+            <th>Komitmen</th><th>Kompetensi</th></tr></thead>
         @foreach ($baris as $b)
             <tr>
                 <td>{{ $b->staff->nama ?? '-' }}<br><small class="text-muted">{{ $b->staff->level ?? '' }} · {{ $b->staff->divisi ?? '' }}</small></td>
@@ -200,32 +173,12 @@
                     <td class="text-nowrap">@if ($kat){{ $nilai }} <span class="badge text-bg-{{ ['Tinggi' => 'success', 'Menengah' => 'primary', 'Cukup' => 'warning', 'Rendah' => 'danger'][$kat] }}">{{ $kat }}</span>
                         <br><small class="text-muted">{{ $D::GAYA[$kat] }}</small>@else - @endif</td>
                 @endforeach
-                @can('admin')<td><a href="{{ route('dashboard.pegawai', ['tab' => 'disc', 'tim' => $tim, 'staff' => $b->disc->staff_id]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a></td>@endcan
             </tr>
         @endforeach
     </table>
     </div>
 </div>
 
-@else
-    <form method="post" action="{{ route('dashboard.pegawai.simpan') }}">
-        @csrf <input type="hidden" name="tahun" value="{{ $tahun }}"><input type="hidden" name="bulan" value="{{ $bulan }}">
-        <div class="table-responsive" style="max-height:560px">
-        <table class="table table-sm small mb-0 align-middle">
-            <thead class="table-light sticky-top"><tr><th>Nama</th><th>Divisi</th><th style="width:150px">Terlambat (menit)</th><th style="width:150px">Tidak hadir (hari)</th></tr></thead>
-            @foreach ($baris as $o)
-                <tr><td>{{ $o->nama }}</td><td class="text-muted">{{ $o->divisi }}</td>
-                    <td><input name="terlambat[{{ $o->id }}]" type="number" min="0" value="{{ $isian[$o->id]->terlambat_menit ?? '' }}" class="form-control form-control-sm"></td>
-                    <td><input name="absen[{{ $o->id }}]" type="number" min="0" max="31" step="0.5" value="{{ isset($isian[$o->id]->tidak_hadir_hari) ? $isian[$o->id]->tidak_hadir_hari + 0 : '' }}" class="form-control form-control-sm"></td></tr>
-            @endforeach
-        </table>
-        </div>
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-            <span class="small text-muted">Rekap {{ $B[$bulan] }} {{ $tahun }} · isian kosong tidak mengubah data.</span>
-            <button class="btn btn-primary">Simpan Rekap</button>
-        </div>
-    </form>
-</div>
 @endif
 @endif
 @endsection

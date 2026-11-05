@@ -17,6 +17,18 @@ class Menu
         ];
     }
 
+    // Isian data dashboard (dashboard sendiri hanya menampilkan)
+    public static function input(): array
+    {
+        return [
+            ['input.kehadiran', 'clock-history', 'Kehadiran & Keterlambatan', 'Rekap bulanan: impor Excel atau isi manual'],
+            ['input.disc', 'person-bounding-box', 'Peta Karakter (DISC)', 'Hasil tes DISC, komitmen & kompetensi pegawai'],
+            ['dashboard.dosen.rapor.index', 'award', 'Rapor & Capaian Dosen', 'Sertifikat, penelitian, pengabdian, publikasi'],
+            ['dashboard.dosen.kompetensi', 'bar-chart-steps', 'Kompetensi Dosen', 'Skill sekarang & target (HRD atau atasan)'],
+            ['dashboard.dosen.mk', 'book', 'MK Inti Prodi', 'Mata kuliah inti per kurikulum & pengampu'],
+        ];
+    }
+
     public static function pengaturan(): array
     {
         return [

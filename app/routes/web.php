@@ -50,6 +50,13 @@ Route::middleware('auth')->group(function () {
     Route::get('dashboard/pegawai', DashboardPegawaiController::class)->name('dashboard.pegawai');
     Route::post('dashboard/pegawai/kehadiran', [DashboardPegawaiController::class, 'simpan'])->name('dashboard.pegawai.simpan');
     Route::post('dashboard/pegawai/disc', [DashboardPegawaiController::class, 'simpanDisc'])->name('dashboard.pegawai.disc');
+    Route::prefix('input')->name('input.')->controller(\App\Http\Controllers\InputController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('kehadiran', 'kehadiran')->name('kehadiran');
+        Route::post('kehadiran/impor', 'impor')->name('kehadiran.impor');
+        Route::get('kehadiran/template', 'template')->name('kehadiran.template');
+        Route::get('disc', 'disc')->name('disc');
+    });
     // Pegawai = staff eUniversity (URL /pegawai, nama route staff.*)
     Route::get('pegawai/atasan', [StaffController::class, 'atasan'])->name('staff.atasan');
     Route::post('pegawai/atasan', [StaffController::class, 'aturAtasan'])->name('staff.atasan.simpan');

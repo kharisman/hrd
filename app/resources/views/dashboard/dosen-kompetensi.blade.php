@@ -76,14 +76,14 @@
         <div class="card-header">Nilai Kompetensi per Dosen {{ $tahun }} <small class="text-muted">· rata-rata skala 1–5, garis merah = target</small></div>
         <div class="table-responsive">
         <table class="table table-sm small mb-0 align-middle">
-            <thead class="table-light"><tr><th>Dosen</th>@unless ($prodi)<th>Prodi</th>@endunless<th style="width:30%">Personal</th><th style="width:30%">Jabatan</th>@if ($bolehUbah)<th></th>@endif</tr></thead>
+            <thead class="table-light"><tr><th>Dosen</th>@unless ($prodi)<th>Prodi</th>@endunless<th style="width:30%">Personal</th><th style="width:30%">Jabatan</th>@if ($bolehUbah->isNotEmpty())<th></th>@endif</tr></thead>
             @foreach ($baris as $b)
                 <tr class="{{ $edit && $edit->model->id === $b->model->id ? 'table-primary' : '' }}">
                     <td>{{ $b->model->nama }}</td>
                     @unless ($prodi)<td class="text-muted">{{ $b->model->program_studi }}</td>@endunless
                     <td>{!! $skor($b->personal, $b->targetPersonal) !!} {!! $naik($b->personal, $b->personalLalu) !!}</td>
                     <td>{!! $skor($b->jabatan, $b->targetJabatan) !!} {!! $naik($b->jabatan, $b->jabatanLalu) !!}</td>
-                    @if ($bolehUbah)<td><a href="{{ route('dashboard.dosen.kompetensi', ['prodi' => $prodi, 'tahun' => $tahun, 'dosen' => $b->model->id]) }}" class="btn btn-sm btn-outline-secondary" title="Ubah"><i class="bi bi-pencil"></i></a></td>@endif
+                    @if ($bolehUbah->isNotEmpty())<td>@if (isset($bolehUbah[$b->model->id]))<a href="{{ route('dashboard.dosen.kompetensi', ['prodi' => $prodi, 'tahun' => $tahun, 'dosen' => $b->model->id]) }}" class="btn btn-sm btn-outline-secondary" title="Ubah"><i class="bi bi-pencil"></i></a>@endif</td>@endif
                 </tr>
             @endforeach
         </table>
