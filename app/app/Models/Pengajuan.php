@@ -116,6 +116,7 @@ class Pengajuan extends Model
     }
 
     // Akun yang memutus tahap sekarang (semua akun ber-NIP sama dengan pemegangnya)
+    // Username pemutus tahap sekarang: akun HRD + username master pegawai (yang belum pernah login ke HRD tetap dikabari)
     public function penerimaTahap()
     {
         $tahap = $this->tahapSekarang();
@@ -123,33 +124,36 @@ class Pengajuan extends Model
             return collect();
         }
         if ($tahap === 'hrd') {
-            return Akun::where('peran', 'admin')->get();
+            return Akun::where('peran', 'admin')->pluck('username');
         }
-        $ids = $tahap === 'atasan' ? collect([$this->staff?->atasan_id])
+        $ids = ($tahap === 'atasan' ? collect([$this->staff?->atasan_id])
             : Pejabat::where('peran', $tahap)->pluck('staff_id')->merge(Pejabat::dariRole($tahap)->pluck('id'))
-                ->when($tahap === 'rektor', fn ($c) => $c->push(Pengaturan::penandatangan()?->id));
-        $nip = Staff::whereIn('id', $ids->filter())->pluck('nip')->filter();
-        return Akun::whereIn('staff_id', Staff::whereIn('nip', $nip)->pluck('id')->merge($ids->filter()))
-            ->where(fn ($q) => $q->whereNull('staff_id')->orWhereNotIn('staff_id', [$this->staff_id]))->get();
+                ->when($tahap === 'rektor', fn ($c) => $c->push(Pengaturan::penandatangan()?->id)))->filter();
+        return self::usernamePegawai($ids)->diff(self::usernamePegawai([$this->staff_id]))->values();
+    }
+
+    // Semua username milik pegawai ini (akun HRD & master staff ber-NIP sama)
+    private static function usernamePegawai($staffIds)
+    {
+        $nip = Staff::whereIn('id', $staffIds)->pluck('nip')->filter();
+        $ids = Staff::whereIn('nip', $nip)->pluck('id')->merge($staffIds);
+        return Akun::whereIn('staff_id', $ids)->pluck('username')->merge(Staff::whereIn('id', $ids)->pluck('username'))->filter()->unique();
     }
 
     // Notifikasi Telegram: pemutus tahap berikutnya, atau pengaju bila sudah selesai (disetujui / ditolak)
     public function kabari(): void
     {
-        $url = route('pengajuan.show', $this);
+        $tautan = fn ($teks) => ['teks' => $teks, 'url' => route('pengajuan.show', $this)];
         $judul = e($this->jenis->nama ?? 'Pengajuan') . ($this->jenis_cuti_id ? ' (' . e($this->jenisCuti->nama ?? '') . ', ' . $this->tgl_mulai->format('d/m/Y') . ' – ' . $this->tgl_selesai->format('d/m/Y') . ", {$this->hari} hari)" : '');
         if ($this->selesai()) {
             $catatan = collect($this->riwayat)->last()['catatan'] ?? null;
-            \App\Services\Telegram::kirim(Akun::where('staff_id', $this->staff_id)->get(),
-                ($this->status === 'Disetujui' ? '✅' : '❌') . " {$judul} <b>{$this->status}</b>" . ($this->nomor ? "
-Nomor: {$this->nomor}" : '')
-                . ($catatan ? "
-Catatan: " . e($catatan) : '') . "
-<a href=\"{$url}\">Lihat pengajuan</a>");
+            \App\Services\Telegram::kirim(self::usernamePegawai([$this->staff_id]),
+                ($this->status === 'Disetujui' ? '✅' : '❌') . " {$judul} <b>{$this->status}</b>" . ($this->nomor ? "\nNomor: {$this->nomor}" : '')
+                . ($catatan ? "\nCatatan: " . e($catatan) : ''), $tautan('Lihat pengajuan'), "hrd-pengajuan-{$this->id}-selesai");
         } else {
             \App\Services\Telegram::kirim($this->penerimaTahap(),
-                "📝 {$judul} dari <b>" . e($this->namaPengaju()) . "</b> menunggu persetujuan Anda ({$this->status}).
-<a href=\"{$url}\">Proses sekarang</a>");
+                "📝 {$judul} dari <b>" . e($this->namaPengaju()) . "</b> menunggu persetujuan Anda ({$this->status}).",
+                $tautan('Proses sekarang'), "hrd-pengajuan-{$this->id}-tahap-{$this->tahap_ke}");
         }
     }
 

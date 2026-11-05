@@ -60,11 +60,6 @@ return [
         'site_name' => env('OPENROUTER_SITE_NAME'),
     ],
 
-    // Bot pengirim notifikasi (bot yang sama dengan OTP eUniversity/BAAK); chat ID penerima dari GET /telegram eUniversity
-    'telegram' => [
-        'token' => env('TELEGRAM_BOT_TOKEN', env('KEY_BOT')),
-    ],
-
     'deepseek' => [
         'key' => env('DEEPSEEK_API_KEY'),
         'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),

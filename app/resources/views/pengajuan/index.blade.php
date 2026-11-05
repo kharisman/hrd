@@ -2,9 +2,6 @@
 @section('title', 'Pengajuan')
 
 @section('actions')
-    @if (\App\Services\Telegram::aktif() && !auth()->user()->telegram_chat_id)
-        <span class="btn btn-outline-secondary disabled" title="Daftarkan Telegram di eUniversity agar dapat notifikasi pengajuan"><i class="bi bi-telegram me-1"></i>Telegram belum terdaftar</span>
-    @endif
     <a href="{{ route('pengajuan.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Buat Pengajuan</a>
 @endsection
 

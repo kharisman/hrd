@@ -76,6 +76,22 @@ class PctApi
         return $this->cek($this->http(null, 8, 3000)->post('/auth/token'))->json('data.token');
     }
 
+    /**
+     * Kirim notifikasi Telegram lewat bot eUniversity (POST /notifikasi, scope notifikasi.kirim) atas nama aplikasi HRD.
+     * Token aplikasi di-cache; 401 -> minta token baru sekali. Balasan: data {id, terkirim, dilewati, gagal}; 409 = kunci duplikat.
+     */
+    public function notifikasi(array $penerima, string $pesan, ?array $tautan = null, ?string $kunci = null): ?array
+    {
+        $kirim = fn () => $this->http(\Illuminate\Support\Facades\Cache::remember('pct_token_aplikasi', now()->addMinutes(50), fn () => $this->tokenAplikasi()), 1)
+            ->post('/notifikasi', array_filter(['penerima' => array_values($penerima), 'pesan' => $pesan, 'format' => 'html', 'tautan' => $tautan, 'kunci' => $kunci]));
+        $res = $kirim();
+        if ($res->status() === 401) {
+            \Illuminate\Support\Facades\Cache::forget('pct_token_aplikasi');
+            $res = $kirim();
+        }
+        return $res->successful() || $res->status() === 409 ? ($res->json('data') ?? []) : $this->galat($res) + ['status' => $res->status()];
+    }
+
     private function galat($res): array
     {
         if ($res->serverError()) {

@@ -3,36 +3,32 @@
 namespace App\Services;
 
 use App\Models\Akun;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-// Bot Telegram untuk notifikasi; chat ID penerima = akuns.telegram_chat_id (dari GET /telegram eUniversity saat sinkron/login).
-// Tanpa TELEGRAM_BOT_TOKEN semua kiriman diam-diam dilewati.
-// ponytail: kirim sinkron (timeout 5 dtk), pindah ke queue bila penerima banyak / bot lambat
+// Notifikasi Telegram lewat API eUniversity (POST /notifikasi): bot & chat ID diurus eUniversity, HRD cukup kirim username.
+// Gagal kirim tidak menggagalkan proses pengajuan, cukup dicatat di log.
+// ponytail: kirim sinkron saat pengajuan diproses; antrekan bila API lambat
 class Telegram
 {
-    public static function aktif(): bool
+    public static function kirim($akun, string $teks, ?array $tautan = null, ?string $kunci = null): ?array
     {
-        return (bool) config('services.telegram.token');
-    }
-
-    public static function api(string $metode, array $data = []): ?array
-    {
-        if (!self::aktif()) {
+        // Terima Akun, koleksi Akun, atau daftar username
+        $username = collect($akun instanceof Akun ? [$akun] : $akun)->map(fn ($a) => $a instanceof Akun ? $a->username : $a)->filter()->unique()->values();
+        if ($username->isEmpty() || !config('services.pct.key')) {
             return null;
         }
         try {
-            return Http::timeout(5)->post('https://api.telegram.org/bot' . config('services.telegram.token') . "/{$metode}", $data)->json();
+            $hasil = null;
+            foreach ($username->chunk(50)->values() as $i => $bagian) { // maks. 50 penerima per permintaan
+                $hasil = app(PctApi::class)->notifikasi($bagian->all(), $teks, $tautan, $kunci && $i ? "{$kunci}-{$i}" : $kunci);
+                if (!empty($hasil['error']) || !empty($hasil['dilewati']) || !empty($hasil['gagal'])) {
+                    Log::info('Notifikasi Telegram', ['kunci' => $kunci, 'hasil' => $hasil]);
+                }
+            }
+            return $hasil;
         } catch (\Throwable $e) {
-            Log::warning("Telegram {$metode} gagal: " . $e->getMessage());
+            Log::warning('Notifikasi Telegram gagal: ' . $e->getMessage());
             return null;
         }
-    }
-
-    // Kirim ke akun-akun yang sudah menautkan Telegram (teks HTML Telegram: <b>, <i>, <a>)
-    public static function kirim($akun, string $teks): void
-    {
-        collect($akun instanceof Akun ? [$akun] : $akun)->pluck('telegram_chat_id')->filter()->unique()
-            ->each(fn ($chat) => self::api('sendMessage', ['chat_id' => $chat, 'text' => $teks, 'parse_mode' => 'HTML', 'disable_web_page_preview' => true]));
     }
 }

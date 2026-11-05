@@ -60,7 +60,7 @@ class AuthController extends Controller
             'divisi' => $profil['divisi'],
             'level' => $profil['level'],
             'last_login_at' => now(),
-        ] + (($tg = Akun::chatTelegram()) !== null ? ['telegram_chat_id' => $tg[strtolower($profil['username'])] ?? null] : []));
+        ]);
 
         auth('pegawai')->login($akun);
         $request->session()->regenerate();
